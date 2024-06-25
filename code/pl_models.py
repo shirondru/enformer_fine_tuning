@@ -5,6 +5,7 @@ import torch.nn as nn
 import lightning.pytorch as pl
 from enformer_pytorch.finetune import HeadAdapterWrapper
 from enformer_pytorch import Enformer
+from torchmetrics.regression import PearsonCorrCoef,R2Score
 
 
 def masked_mse(y_hat,y):
@@ -120,7 +121,7 @@ class LitModel(pl.LightningModule):
         for tissue_idx,tissue in enumerate(self.tissues_to_train):
             if tissue_idx not in tissue_indices_without_data:
                 self.pred_dict[gene_name][tissue].append(y_hat[:,tissue_idx])
-                self.target_dict[gene_name][tissue].append(y[:,tissue_idx]
+                self.target_dict[gene_name][tissue].append(y[:,tissue_idx])
                 self.donor_dict[gene_name][tissue].append(donor)
                 self.rank_dict[gene_name][tissue].append(rank)
 
@@ -141,10 +142,8 @@ class LitModel(pl.LightningModule):
         self.save_eval_results(y_hat,y,donor,rank,gene_name)
 
     def on_train_epoch_end(self):
-        self.train_dataset.set_epoch(self.current_epoch + 1) #increment epoch for train dataset, which is necessary for determining when to reverse complement sequence (when applicable)
-        self.train_dataset.shuffle_and_define_epoch() #shuffle dataset
-        if hasattr(self.train_dataset,'indiv_idx_to_use'): #if training with multiple genes_per batch, reset the counter that keeps track of which person's genome seq to use per batch
-            self.train_dataset.indiv_idx_to_use = self.train_dataset.create_indiv_idx_dict()
+        self.train_dataset.shuffle_and_define_epoch() #shuffle dataset. Ensures this occurs on the main process even if num_workers > 0
+
     
     def configure_optimizers(self):
         optimizer = torch.optim.AdamW(self.parameters(), lr = self.learning_rate)
@@ -204,21 +203,21 @@ class MetricLogger(pl.Callback):
         self.metrics_history = {'epoch': [],'pearsonr':[], 'r2':[],'gene_name': [],'tissue': [],'per_gene_tissue_val_loss': [],'gene_split':[],'donor_split': []}
     def log_predictions(self,trainer,pl_module,donor_split):
         # pred_df = pd.DataFrame(pl_module.pred_dict).apply(pd.Series.explode)
-        pred_df = pd.DataFrame(pl_module.pred_dict[dataloader_idx])
+        pred_df = pd.DataFrame(pl_module.pred_dict)
         pred_df = pred_df.reset_index(names = 'tissue').melt(id_vars = ['tissue'],var_name = 'gene',value_name = 'y_pred')
         pred_df['y_pred'] = pred_df['y_pred'].apply(lambda y_pred: [x.item() for x in y_pred]) #y_pred is a list of torch tensors. convert it to a list of floats
         pred_df = pred_df.explode('y_pred') #explode the list of floats so they each get their own row and the list is removed
         # target_df = pd.DataFrame(pl_module.target_dict).apply(pd.Series.explode)
-        target_df = pd.DataFrame(pl_module.target_dict[dataloader_idx])
+        target_df = pd.DataFrame(pl_module.target_dict)
         target_df = target_df.reset_index(names = 'tissue').melt(id_vars = ['tissue'],var_name = 'gene',value_name = 'y_true')
         target_df['y_true'] = target_df['y_true'].apply(lambda y_true: [x.item() for x in y_true]) #y_pred is a list of torch tensors. convert it to a list of floats
         target_df = target_df.explode('y_true')
         # donor_df = pd.DataFrame(pl_module.donor_dict).apply(pd.Series.explode)
-        donor_df = pd.DataFrame(pl_module.donor_dict[dataloader_idx])
+        donor_df = pd.DataFrame(pl_module.donor_dict)
         donor_df = donor_df.reset_index(names = 'tissue').melt(id_vars = ['tissue'],var_name = 'gene',value_name = 'donor')
         donor_df = donor_df.explode('donor')
 
-        rank_df = pd.DataFrame(pl_module.rank_dict[dataloader_idx])
+        rank_df = pd.DataFrame(pl_module.rank_dict)
         rank_df = rank_df.reset_index(names = 'tissue').melt(id_vars = ['tissue'],var_name = 'gene',value_name = 'rank')
         rank_df = rank_df.explode('rank')
 
@@ -256,13 +255,14 @@ class MetricLogger(pl.Callback):
         assert len(df['donor_split'].unique()) == 1 & (df['donor_split'].unique().item() == donor_split), f"You have data from {df['donor_split'].unique()} donors but should only have {donor_split}!"
         for gene_split in list(df['gene_split'].unique()):
             #save results across all tissues for this epoch
-            mean_epoch_corr = np.mean(df[df['gene_split'] == gene_split]['pearsonr'])
-            mean_epoch_r2 = np.mean(df[df['gene_split'] == gene_split]['r2'])
-            mean_epoch_loss = np.mean(df[df['gene_split'] == gene_split]['per_gene_tissue_val_loss'])
+            mean_epoch_corr = df[df['gene_split'] == gene_split]['pearsonr'].mean()
+            mean_epoch_r2 = df[df['gene_split'] == gene_split]['r2'].mean()
+            mean_epoch_loss = df[df['gene_split'] == gene_split]['per_gene_tissue_val_loss'].mean()
             epoch_dict = { 
                 f'mean_pearsonr_across_{gene_split}_genes_across_{donor_split}_donors':mean_epoch_corr.item(),
                 f'mean_r2_across_{gene_split}_genes_across_{donor_split}_donors':mean_epoch_r2.item(),
-                f'mean_loss_{gene_split}_genes_across_{donor_split}_donors':mean_epoch_loss.item(),
+                f'mean_loss_{gene_split}_genes_across_{donor_split}_donors':mean_epoch_loss.item()
+            }
             if trainer.num_devices > 1: #sync across multiple GPUs, if applicable
                 pl_module.log_dict(epoch_dict,sync_dist = True)
             else:
@@ -292,7 +292,7 @@ class MetricLogger(pl.Callback):
         self.epoch = epoch
 
     def log_and_save_eval(self,trainer,pl_module,donor_split):
-        self.get_epoch(trainer,pl_module,donor_split) #define self.epoch
+        self.get_epoch(trainer,pl_module) #define self.epoch
         self.add_all_genes_to_metrics_history(pl_module,donor_split)
         self.log_predictions(trainer,pl_module,donor_split) #log y_pred and y_true for each donor and gene being evaluated
         self.log_per_gene_per_tissue_metrics(trainer,pl_module,donor_split)

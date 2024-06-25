@@ -1,0 +1,2 @@
+This folder contains one gene file and a copy of the blood_config.yaml file (but with the experiment name changed within) to test reproducibility using this single gene
+The gene folder contains only one gene so the script won't loop through all 301

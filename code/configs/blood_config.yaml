@@ -1,0 +1,11 @@
+seq_length: 49152
+learning_rate: 5e-6
+train_batch_size: 32
+num_individuals_per_gene: 128
+alpha: 0.5
+experiment_name: "WholeBlood"
+max_epochs: 150
+precision: bf16-mixed
+tissues_to_train: "Whole Blood"
+gradient_clip_val: 0.05
+seed: 0

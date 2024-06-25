@@ -1,0 +1,26 @@
+seq_length: 49152
+learning_rate: 5e-6
+rc_rate: -1
+train_batch_size: 32
+num_individuals_per_gene: 128
+alpha: 0.5
+donor_pickiness: "any_tissue"
+eval_batch_norm: 0 #using headapterwrapper anyways
+experiment_name: "TestReproducibility"
+# dropout_rate: 0.5
+freeze_enformer: "false"
+genes_per_batch: 1
+max_epochs: 150
+# output_head: "MLP_2"
+precision: bf16-mixed
+tissues_to_train: "Whole Blood"
+valid_metrics_save_freq: 1
+monitor: mean_r2_across_train_genes_across_valid_donors
+k: 1
+patience: 20
+donor_split_type: train_val_test
+DATA_DIR: /pollard/data/projects/sdrusinsky/enformer_TL/data
+gradient_clip_val: 0.05
+normalization: eqtl_norm
+use_all_ppl: true
+seed: 0

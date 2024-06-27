@@ -11,7 +11,7 @@
 #SBATCH --job-name=gtex
 
 eval "$(/pollard/home/sdrusinsky/miniforge3/bin/conda shell.bash hook)"
-source /pollard/home/sdrusinsky/miniforge3/bin/activate sean_env2
+source /pollard/home/sdrusinsky/miniforge3/bin/activate test_pt231
 export CUBLAS_WORKSPACE_CONFIG=:4096:8
 
 config_path=$1

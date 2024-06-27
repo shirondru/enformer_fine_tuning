@@ -71,7 +71,14 @@ def define_donor_paths(config,dataset):
         config.update({'valid_donor_path':os.path.join(donor_dir,f"person_ids-val-fold{config.fold}.txt")})
         config.update({'test_donor_path':os.path.join(donor_dir,f"person_ids-test-fold{config.fold}.txt")})
     elif dataset == 'rosmap':
-        pass
+        #train and validation set are from rosmap. Test set will be individuals from gtex to enable cross-cohort evaluation
+        rosmap_dir = os.path.join(config.DATA_DIR,'cross_validation_folds',dataset)
+        config.update({'train_donor_path':os.path.join(rosmap_dir,f"person_ids-train-fold{config.fold}.txt")})
+        config.update({'valid_donor_path':os.path.join(rosmap_dir,f"person_ids-val-fold{config.fold}.txt")})
+
+        #using all individuals from gtex as test set. Dataset will keep only those with brain cortex data.
+        all_gtex_donor_path = os.path.join(config.DATA_DIR,'cross_validation_folds','gtex','All_GTEx_ID_list.txt')
+        config.update({'test_donor_path' : all_gtex_donor_path}) 
     else:
         raise Exception(f"Dataset: {dataset} not supported!")
 
@@ -125,8 +132,8 @@ def load_trainer(config):
         gradient_clip_val = config.gradient_clip_val,
         callbacks = [checkpoint_callback,metric_logger,early_stopper],
         logger = WandbLogger(),
-        num_sanity_val_steps = 0 #don't do any validation before training, as all sorts of R2 metrics will be computed during callbacks. Could lead to error with small sample size
-
+        num_sanity_val_steps = 0, #don't do any validation before training, as all sorts of R2 metrics will be computed during callbacks. Could lead to error with small sample size
+        log_every_n_steps = 1
     )
     return trainer
 def load_callbacks(config):
@@ -211,7 +218,7 @@ def main():
         wandb.config.update({'train_genes':train_genes})
         wandb.config.update({'valid_genes':valid_genes})
         wandb.config.update({'test_genes':test_genes})
-        wandb.config.update({'save_dir' : os.path.join(current_dir,f"../results/{config['experiment_name']}/{model_type}/{wandb_filename}/Fold-{fold}/{wandb.run.id}")})
+        wandb.config.update({'save_dir' : os.path.join(current_dir,f"../results/{config['experiment_name']}/{model_type}/{train_gene_filename.strip('.txt')}/Fold-{fold}/{wandb.run.id}")})
         pl.seed_everything(int(wandb.config.seed), workers=True)
         torch.use_deterministic_algorithms(True)
         train_gtex(wandb.config,train_genes,valid_genes,test_genes)

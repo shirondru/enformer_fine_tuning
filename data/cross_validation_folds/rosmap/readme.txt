@@ -1,0 +1,2 @@
+There are only train and validation splits here beacuse GTEx brain cortex data is meant to be used as the fully held out test set
+ROSMAP ids were split into 80-10-10 train/val/test splits and then the val and train sets were combined and the test set was renamed to a 'val' set. 

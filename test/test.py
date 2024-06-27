@@ -5,7 +5,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../code
 from train_gtex import *
 from eval_enformer_gtex import slice_enformer_pred
 torch.use_deterministic_algorithms(True)
-
+from ism_performer import load_model
 def test_train_dataloader():
     config_path = "../code/configs/blood_config.yaml"
     model_type = 'SingleGene'
@@ -157,5 +157,36 @@ def test_performer_ism():
     test that loading from checkpoint yields same prediction on validation set from the checkpoint's epoch dring training
     Then ensure you get same prediction as in the script with ref seq when you introduce a SNP
     """
+    cwd = os.getcwd()
+    run_id = 'bx5gnldp'
+    fold = 0
+    save_dir=os.path.join(cwd,f"../results/FinalPaperWholeBlood/SingleGene/BTNL3/Fold-{fold}/{run_id}")
+    ckpt = 'epoch=65-step=264.ckpt'
+    ckpt_epoch = int(ckpt.split('epoch=')[1].split('-')[0])
+    model = load_model(ckpt,save_dir,run_id)
+    model.cuda()
+    model.eval()
+    data_dir = os.path.join(cwd,'../data')
+    valid_donor_path = os.path.join(data_dir,f'cross_validation_folds/gtex/cv_folds/person_ids-val-fold{fold}.txt') #use fold 0 here
+    
+    expression_dir = os.path.join(data_dir,"gtex_eqtl_expression_matrix")
+    gene_id_mapping = pd.read_csv(os.path.join(expression_dir,"gene_id_mapping.csv"))
+    df_path = os.path.join(expression_dir,f"Whole_Blood.v8.normalized_expression.bed.gz")
+    gtex_gene_expression_df = pd.read_csv(df_path,sep = '\t')
+    gtex_gene_expression_df = gtex_gene_expression_df.merge(gene_id_mapping, left_on = 'gene_id',right_on = 'Name')
+
+    pl.seed_everything(0)
+    valid_ds = GTExDataset(['Whole Blood'], ['BTNL3'], 196608 // 4, -1, valid_donor_path, gtex_gene_expression_df, data_dir)
+
+    x,y,gene,donor,_ = valid_ds[10]
+    with torch.no_grad():
+        y_hat = model(torch.from_numpy(x).unsqueeze(0).cuda())
+        y_hat = y_hat[:,y_hat.shape[1]//2,:].item()
+    
+    expected_results = pd.read_csv(os.path.join(save_dir,f"Prediction_Results_{ckpt_epoch}_in_valid_donors.csv"))
+    expected_results = expected_results[(expected_results['gene'] == gene) & (expected_results['donor'] == donor)]
+    expected_y_hat = expected_results['y_pred'].item()
+    assert np.allclose(y_hat,expected_y_hat,atol = 1e-1) #offer lots of tolerance because this is on a diff gpu. True differences between people vary by much more than this tolerance
+    print("Loading Checkpoint Test Succesful")
 if __name__ == '__main__':
-    test_enformer_eval_gtex()
+    test_performer_ism()

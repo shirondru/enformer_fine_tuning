@@ -1,11 +1,11 @@
 import os
 import sys
 import numpy as np
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../code')))
-from train_gtex import *
-from eval_enformer_gtex import slice_enformer_pred
+#sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../code')))
+from performer.train_gtex import *
+from performer.eval_enformer_gtex import slice_enformer_pred
 torch.use_deterministic_algorithms(True)
-from ism_performer import load_model
+from performer.ism_performer import load_model
 def test_train_dataloader():
     config_path = "../code/configs/blood_config.yaml"
     model_type = 'SingleGene'

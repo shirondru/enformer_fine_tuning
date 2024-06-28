@@ -12,3 +12,4 @@ data/gtex_eqtl_expression_matrix/Brain_Cortex.v8.normalized_expression.bed.gz
 data/GTEx_Analysis_2017-06-05_v8_WholeGenomeSeq_838Indiv_Analysis_Freeze_SNPsOnly.vcf.gz*
 data/expression-rosmap.parquet
 data/hg38_genome.fa*
+*.egg-info

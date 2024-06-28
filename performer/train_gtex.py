@@ -1,5 +1,5 @@
 import argparse
-from pl_models import *
+from performer.pl_models import *
 from datasets import *
 import yaml
 import wandb

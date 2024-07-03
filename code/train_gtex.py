@@ -27,17 +27,23 @@ def prepare_genes(config):
     tissue = config['tissues_to_train'].replace(' -','').replace(' ','_').replace('(','').replace(')','')
     data_dir = config['DATA_DIR']
     
-    train_gene_filedir = os.path.join(data_dir,'genes',tissue,model_type)
-    train_gene_filenames = os.listdir(train_gene_filedir) #if its a single gene model, there will be 1 txt file per train gene, if multi-gene it will 1 total txt file containing all genes
-    
-    if model_type == 'MultiGene':
-        valid_genes = []
-        test_gene_path = os.path.join(data_dir,'genes',tissue,model_type,'test_genes.txt')
-        test_genes = parse_gene_files(test_gene_path)
-    elif model_type == 'SingleGene':
-        valid_genes = []
-        test_genes = []
-
+    #if desired genes to use explicitly defined in config file, use only those
+    if 'train_gene_path' in config:
+        train_gene_filedir = os.path.dirname(config['train_gene_path'])
+        train_gene_filenames = [os.path.basename(config['train_gene_path'])] #script expects a list of filenames
+        valid_genes = parse_gene_files(config['valid_gene_path']) 
+        test_genes = parse_gene_files(config['test_gene_path']) 
+    else:
+        train_gene_filedir = os.path.join(data_dir,'genes',tissue,model_type)
+        train_gene_filenames = os.listdir(train_gene_filedir) #if its a single gene model, there will be 1 txt file per train gene, if multi-gene it will 1 total txt file containing all genes
+        
+        if model_type == 'MultiGene':
+            valid_genes = []
+            test_gene_path = os.path.join(data_dir,'genes',tissue,'test_genes.txt')
+            test_genes = parse_gene_files(test_gene_path)
+        elif model_type == 'SingleGene':
+            valid_genes = []
+            test_genes = []
     return train_gene_filedir, train_gene_filenames, valid_genes, test_genes
 
 def ensure_no_gene_overlap(train_genes,val_genes,test_genes):
@@ -186,10 +192,13 @@ def main():
     parser.add_argument("--config_path",type=str)
     parser.add_argument("--fold",type=int)
     parser.add_argument("--model_type",type=str)
+
     args = parser.parse_args()
     config_path = args.config_path
     fold = int(args.fold)
     model_type = args.model_type
+    assert model_type in ['SingleGene','MultiGene']
+    
 
     current_dir = os.path.dirname(__file__)
     DATA_DIR = os.path.join(current_dir,'../data')
@@ -202,15 +211,15 @@ def main():
 
     
     train_gene_filedir, train_gene_filenames, valid_genes, test_genes = prepare_genes(config)
-
     #if training a single gene model, loop through all single gene files in the dir. If its a multi gene model, there is only 1 train gene file and loop will exit after 1 iteration
     for train_gene_filename in train_gene_filenames:
         wandb_filename = f"{config['model_type']}_{train_gene_filename.strip('.txt')}"
         train_gene_path = os.path.join(os.path.join(train_gene_filedir,train_gene_filename))
         train_genes = parse_gene_files(train_gene_path) #will contain 1 gene if this is a single gene model, else it will contain ~300 genes
+        wandb_exp_name = config['experiment_name'] + f'_Fold-{fold}_' + wandb_filename
         wandb.init(
             project = 'fine_tune_enformer',
-            name = config['experiment_name'] + f'_Fold-{fold}_' + wandb_filename,
+            name = wandb_exp_name,
             group = config['experiment_name'],
             config = config
         )
@@ -223,7 +232,7 @@ def main():
         torch.use_deterministic_algorithms(True)
         train_gtex(wandb.config,train_genes,valid_genes,test_genes)
         wandb.finish()
-        
+            
 
 
 if __name__ == '__main__':

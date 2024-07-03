@@ -94,21 +94,23 @@ def main():
         wandb_filename = f"{config['model_type']}_{train_gene_filename.strip('.txt')}"
         train_gene_path = os.path.join(os.path.join(train_gene_filedir,train_gene_filename))
         train_genes = parse_gene_files(train_gene_path) #will contain 1 gene if this is a single gene model, else it will contain ~300 genes
-        wandb.init(
-            project = 'fine_tune_enformer',
-            name = config['experiment_name'] + f'_Fold-{fold}_' + wandb_filename,
-            group = config['experiment_name'],
-            config = config
-        )
-        wandb.config.update({'fold':fold})
-        wandb.config.update({'train_genes':train_genes})
-        wandb.config.update({'valid_genes':valid_genes})
-        wandb.config.update({'test_genes':test_genes})
-        wandb.config.update({'save_dir' : os.path.join(current_dir,f"../results/{config['experiment_name']}/{model_type}/{train_gene_filename.strip('.txt')}/Fold-{fold}/{wandb.run.id}")})
-        pl.seed_everything(int(wandb.config.seed), workers=True)
-        torch.use_deterministic_algorithms(True)
-        train_rosmap(wandb.config,train_genes,valid_genes,test_genes)
-        wandb.finish()
+        save_dir = os.path.join(current_dir,f"../results/{config['experiment_name']}/{model_type}/{train_gene_filename.strip('.txt')}/Fold-{fold}")
+        if not os.path.exists(save_dir): #run if this file doesn't already exist, to enable resuming if job runs out of time or crashes for some reason.
+            wandb.init(
+                project = 'fine_tune_enformer',
+                name = config['experiment_name'] + f'_Fold-{fold}_' + wandb_filename,
+                group = config['experiment_name'],
+                config = config
+            )
+            wandb.config.update({'fold':fold})
+            wandb.config.update({'train_genes':train_genes})
+            wandb.config.update({'valid_genes':valid_genes})
+            wandb.config.update({'test_genes':test_genes})
+            wandb.config.update({'save_dir' : os.path.join(save_dir,wandb.run.id)})
+            pl.seed_everything(int(wandb.config.seed), workers=True)
+            torch.use_deterministic_algorithms(True)
+            train_rosmap(wandb.config,train_genes,valid_genes,test_genes)
+            wandb.finish()
 
 if __name__ == '__main__':
     main()

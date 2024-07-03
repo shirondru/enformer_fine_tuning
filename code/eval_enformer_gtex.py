@@ -70,7 +70,7 @@ def get_enformer_output_dim_from_tissue(tissues_to_train):
             enformer_output_dims.append(enformer_output_dim)
     return enformer_tissue_names,enformer_output_dims
 
-def slice_enformer_pred(pred,n_center_bins):
+def slice_enformer_pred(pred,n_center_bins, arr_center = None):
     """
     Takes either the center bin and returns the array, or takes the 3 center bins and computes the sum over those 3 bins and returns the sequence
     The enformer output dimension is left untouched and will be indexed separately
@@ -78,11 +78,14 @@ def slice_enformer_pred(pred,n_center_bins):
     If the seq length is the full 196608, the number of bins will be 1536, not 896, because cropping is skipped. But the center bin (768) will be identical to the center bin of the cropped output (448)
     """
     assert pred.shape[0] == 1, "This does not handle multi-batch inputs"
-    arr_center = pred.shape[1] // 2
+    if arr_center is None: #if no center bin is defined, use the center of the input sequence. Otherwise, take center bins around the defined center bin
+        arr_center = pred.shape[1] // 2
     if n_center_bins == 1:
         pred = pred[0,arr_center,:].detach().cpu()
-    else:
+    elif n_center_bins == 3:
         pred = pred[0,arr_center - 1 : arr_center + 2,:].sum(axis = 0).detach().cpu() #take 3 center bins and sum over them. Keep enformer output dimension for now, it will be selected below
+    else:
+        pred = pred[0,arr_center - (n_center_bins // 2) : arr_center + (n_center_bins // 2),:].sum(axis = 0).detach().cpu()
     return pred
 
 def get_enformer_predictions(seq_length,test_dataloader,tissue_str_list,desired_enformer_outputs,n_center_bins):
@@ -112,6 +115,7 @@ def get_enformer_predictions(seq_length,test_dataloader,tissue_str_list,desired_
                 enformer_pred_full[gene_name] = {tissue:[] for tissue in tissue_str_list}
                 donor_order[gene_name] = {tissue:[] for tissue in tissue_str_list}
             
+            assert x.shape[1] == seq_length
             pred = enformer_full(x.cuda())['human']
             #use only desired # of TSS-overlapping center bins for evaluation, as well as the desired output dimension
             pred = slice_enformer_pred(pred,n_center_bins)
@@ -178,6 +182,7 @@ def main():
     data_dir = os.path.join(cwd,'../data')
     config.DATA_DIR = data_dir
     config.fold = donor_fold
+    config.seq_length = desired_seq_len
 
     experiment_name = config.experiment_name
     define_donor_paths(config,'gtex')

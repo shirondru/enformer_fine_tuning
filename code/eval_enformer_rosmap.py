@@ -35,6 +35,8 @@ def main():
     data_dir = os.path.join(cwd,'../data')
     config.DATA_DIR = data_dir
     config.fold = donor_fold
+    config.seq_length = desired_seq_len
+
 
     experiment_name = config.experiment_name
     define_donor_paths(config,'rosmap')

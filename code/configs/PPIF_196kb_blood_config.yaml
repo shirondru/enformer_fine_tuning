@@ -1,0 +1,14 @@
+seq_length: 196608
+learning_rate: 5e-6
+train_batch_size: 8
+num_individuals_per_gene: 128
+alpha: 0.5
+experiment_name: "PPIF196kb_FinalPaperWholeBlood"
+max_epochs: 150
+precision: bf16-mixed
+tissues_to_train: "Whole Blood"
+gradient_clip_val: 0.05
+seed: 0
+train_gene_path: /pollard/data/projects/sdrusinsky/enformer_fine_tuning/data/genes/Whole_Blood/SingleGene/PPIF.txt
+valid_gene_path: /pollard/data/projects/sdrusinsky/enformer_fine_tuning/data/genes/empty.txt
+test_gene_path: /pollard/data/projects/sdrusinsky/enformer_fine_tuning/data/genes/empty.txt

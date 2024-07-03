@@ -23,7 +23,7 @@ echo $(pwd)
 
 #evaluate blood
 path_to_train_genes_file=../data/genes/Whole_Blood/MultiGene/300_train_genes.txt
-path_to_eval_genes_file=../data/genes/Whole_Blood/MultiGene/test_genes.txt
+path_to_eval_genes_file=../data/genes/Whole_Blood/test_genes.txt
 config_path=configs/blood_config.yaml
 name=WholeBloodTrainTestGenes
 n_center_bins=3
@@ -37,13 +37,13 @@ done
 
 #evaluate brain
 path_to_train_genes_file=../data/genes/Brain_Cortex/MultiGene/300_train_genes.txt
-path_to_eval_genes_file=../data/genes/Brain_Cortex/MultiGene/test_genes.txt
+path_to_eval_genes_file=../data/genes/Brain_Cortex/test_genes.txt
 config_path=configs/brain_config.yaml
 name=BrainCortexTrainTestGenes
 n_center_bins=3
 python_script=eval_enformer_rosmap.py
+donor_fold=0 #only doing one fold because evaluating is test with all people from GTEx. So other training would use the same GTEx individuals and it is redundant
 for desired_seq_len in 49152 196608; do
-    for donor_fold in 0 1 2; do
-        python $python_script --path_to_train_genes_file $path_to_train_genes_file --path_to_eval_genes_file $path_to_eval_genes_file --config_path $config_path --name $name --donor_fold $donor_fold  --n_center_bins $n_center_bins --desired_seq_len $desired_seq_len 
-    done
+    python $python_script --path_to_train_genes_file $path_to_train_genes_file --path_to_eval_genes_file $path_to_eval_genes_file --config_path $config_path --name $name --donor_fold $donor_fold  --n_center_bins $n_center_bins --desired_seq_len $desired_seq_len 
 done
+

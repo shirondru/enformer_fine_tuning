@@ -32,7 +32,7 @@ def main():
 
     cwd = os.getcwd()
     DATA_DIR = os.path.join(cwd,'../data')
-    outdir = os.path.join(cwd,'results/EnformerISM')
+    outdir = os.path.join(cwd,'../results/EnformerISM')
     if not os.path.exists(outdir):
         os.makedirs(outdir)
 

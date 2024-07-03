@@ -52,11 +52,11 @@ def get_all_gtex_snps(gene, window = 10000):
                 chrom = record.CHROM
                 variant_dict['region'].append(region)
                 variant_dict['chrom'].append(chrom)
-                variant_dict['pos1'].append(record.POS)
-                variant_dict['pos0'].append(record.POS - 1)
+                variant_dict['pos1'].append(record.POS) #VCF is 1-based
+                variant_dict['pos0'].append(record.POS - 1) #record 0-based coordinate, because pysam is 0-based
                 variant_dict['ref'].append(ref)
                 variant_dict['alt'].append(alt)
-                variant_dict['AF'].append(record.INFO['AF'][0])
+                variant_dict['AF'].append(record.INFO['AF'][0]) #allele frequency
                 variant_dict['gene_name'] = gene
         return pd.DataFrame(variant_dict)
     else:
@@ -74,6 +74,10 @@ def get_ckpt(save_dir):
 def one_hot_encode(sequence):
   return kipoiseq.transforms.functional.one_hot_dna(sequence).astype(np.float32)
 def tss_centered_sequences(variant_df, desired_seq_len):
+    """
+    Generates sequences for ISM -- two one-hot encoded sequences per SNP, one with the ref allele and one with the alt allele, with the TSS of the gene at the center. 
+    The SNPs themselves are not placed at the center of the sequence, the gene TSS is always centered, allowing for just one forward pass for the reference sequence per gene.
+    """
     cwd = os.getcwd()
     DATA_DIR = os.path.join(cwd,"../data")
     gene = variant_df['gene_name'].unique().item()
@@ -94,6 +98,8 @@ def tss_centered_sequences(variant_df, desired_seq_len):
         index = variant_info['pos0'] - region_start
         assert ref_seq[index] == variant_info['ref'], "nucleotide in reference genome should be identical to the reference allele of the current SNP at the current position"
         alt_seq = ref_seq[:index] + variant_info['alt'] + ref_seq[index + 1:] # put alt allele in its correct position and ref seq around it
+        # assert ref_seq[index - 1] == alt_seq[index - 1]
+        # assert ref_seq[index + 1] == alt_seq[index + 1]
         yield {'inputs': {'ref': one_hot_encode(ref_seq),
                       'alt': one_hot_encode(alt_seq)},
                'metadata': {'chrom': variant_info.chrom,
@@ -111,6 +117,13 @@ def parse_gene_files(filepath):
         for gene in file:
             gene_list.append(gene.strip())
     return gene_list
+
+def clean_genes(metadata):
+    metadata['genes_for_training'] = metadata['genes_for_training'].str.strip('[]').str.replace('"','').str.split(',')
+    metadata['genes_for_valid'] = metadata['genes_for_valid'].str.strip('[]').str.replace('"','').str.split(',')
+    metadata['genes_for_test'] = metadata['genes_for_test'].str.strip('[]').str.replace('"','').str.split(',')
+
+
 class LitModelPerformerISM(pl.LightningModule):
     """To wrap Model within LightningModule to form ISM predictions within Lightning Trainer object, for easy handling of precision among other things"""
     def __init__(self, model, run_id, ckpt):
@@ -177,21 +190,25 @@ def load_model(ckpt,save_dir,run_id):
 def main():
     parser = argparse.ArgumentParser(description="For ISM")
     parser.add_argument("--path_to_metadata",type=str,help = "Metadata from Wandb run to ensure correct specifications are used")
-    parser.add_argument("--path_to_genes_file",type=str,nargs='?',help = "txt file containing one gene per line. Genes for which surrounding SNPs will be used for ISM")
     parser.add_argument("--model_type",type=str, help = 'One of SingleGene or MultiGene')
-
+    parser.add_argument("--outdir",type=str,nargs ='?', help = 'Optional directory to save outputs')
+    parser.add_argument("--path_to_only_genes_file",type=str,nargs ='?', help = 'Optional path to a txt file containing an explicit set of genes to evaluate. Each gene must be on its own row')
     args = parser.parse_args()
     metadata = pd.read_csv(args.path_to_metadata)
-    metadata = metadata.rename(columns = {'ID':'run_id'})
+    outdir = args.outdir
     model_type = args.model_type
+    path_to_only_genes_file = args.path_to_only_genes_file
+    metadata = metadata.rename(columns = {'ID':'run_id'})
+    clean_genes(metadata)
     assert model_type in ['SingleGene','MultiGene']
     
-    path_to_genes_file = args.path_to_genes_file
-    genes_to_score = parse_gene_files(path_to_genes_file)
+    
+
 
     cwd = os.getcwd()
     data_dir = os.path.join(cwd,'../data')
-    outdir = os.path.join(cwd,'../results/PerformerISM')
+    if not outdir:
+        outdir = os.path.join(cwd,'../results/PerformerISM')
     enformer_regions = pd.read_csv(os.path.join(data_dir,"Enformer_genomic_regions_TSSCenteredGenes_FixedOverlapRemoval.csv"))
     pl.seed_everything(0, workers=True)
     for idx, row in metadata.iterrows():
@@ -202,6 +219,13 @@ def main():
         window = desired_seq_len // 2 #window is the amount of bp ahead and behind the TSS to score. Half the sequence length to score the entire sequence 
         precision = row['precision']
         save_dir = row['save_dir']
+        valid_genes = row['genes_for_valid']
+        train_genes = row['genes_for_training']
+        test_genes = row['genes_for_test']
+        if path_to_only_genes_file:
+            genes_to_score = parse_gene_files(path_to_only_genes_file)
+        else:
+            genes_to_score = valid_genes + train_genes + test_genes
         ckpt = get_ckpt(save_dir)
         if ckpt is None: #some models won't have checkpoints saved. Namely, if the gene they were meant to be trained with is incompatible and there are no other train genes available to train them, training exits and there is no ckpt
             continue

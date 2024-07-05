@@ -12,3 +12,5 @@ seed: 0
 train_gene_path: /pollard/data/projects/sdrusinsky/enformer_fine_tuning/data/genes/Whole_Blood/SingleGene/PPIF.txt
 valid_gene_path: /pollard/data/projects/sdrusinsky/enformer_fine_tuning/data/genes/empty.txt
 test_gene_path: /pollard/data/projects/sdrusinsky/enformer_fine_tuning/data/genes/empty.txt
+patience: 20
+valid_metrics_save_freq: 1

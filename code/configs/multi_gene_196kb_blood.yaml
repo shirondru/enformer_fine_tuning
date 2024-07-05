@@ -9,3 +9,5 @@ precision: bf16-mixed
 tissues_to_train: "Whole Blood"
 gradient_clip_val: 0.05
 seed: 0
+patience: 20
+valid_metrics_save_freq: 1

@@ -1,11 +1,12 @@
 import os
 import pandas as pd
 import numpy as np
-from torch.utils.data import Dataset
 import kipoiseq
 import random
 import pysam
 from lightning.pytorch import LightningDataModule
+from torch.utils.data import Dataset, DataLoader
+from torch.utils.data.distributed import DistributedSampler
 
 class GTExDataset(Dataset):
     def __init__(self, 
@@ -266,6 +267,157 @@ class ROSMAPDataset(GTExDataset):
         gene_expression_vector[0] = indiv_tpm.sum(min_count = 1)
         return gene_expression_vector
 
+class EvalAcrossGeneDataset(GTExDataset):
+    """
+    A dataset that offers, for a given set of genes (requested regions) the TSS-centered reference genome sequence and average GTEx expression value
+    """
+    def __init__(self,tissues_to_train,
+                 requested_regions,
+                 desired_seq_len,
+                 gene_expression_df,
+                 DATA_DIR): 
+        assert len(tissues_to_train) == 1, "This class only supports evaluation across genes 1 gene at a time"
+        self.tissue = tissues_to_train[0]
+        donor_list_path = os.path.join(DATA_DIR,"All_GTEx_ID_list.txt") #not using list of donors. Just Reference Genome. So donor list path includes all GTEx individuals so I take average expression among all of them
+        num_individuals_per_gene = 1 #one reference genome per gene
+        super().__init__(tissues_to_train,requested_regions,desired_seq_len,num_individuals_per_gene,donor_list_path,gene_expression_df,DATA_DIR)
+        self.ref_seq_open = pysam.Fastafile(os.path.join(self.DATA_DIR,"hg38_genome.fa")) #keep ref seq open to use to switch variants to reference allele (i.e, mask them)
+
+    def shuffle_and_define_epoch(self):
+        self.genomic_regions_df = self.genomic_regions_df.sample(frac=1).reset_index(drop=True) #shuffle dataset. Keep this here so the dataset shuffling within litmodel.on_train_epoch_end persists
+        
+        self.region_rows_in_epoch = [] 
+        for i in range(0, len(self.genomic_regions_df), 1):
+            self.region_rows_in_epoch.append(self.genomic_regions_df.iloc[i])
+
+    def _get_ref_seq_for_gene(self, region_chr,region_start,region_end):
+        ref_seq = self.ref_seq_open.fetch(region_chr, region_start, region_end).upper()
+        return self._one_hot_encode(ref_seq)
+    def _get_avg_GTEx_gene_expr(self,gene_name):
+        gene_expression_vector = np.zeros((len(self.tissues_to_train)), dtype=np.float32)
+        #self.individuals_in_split are all people with data in this tissue and for which we have WGS
+        gene_df = self.gene_expression_df[self.gene_expression_df['Description'].isin(gene_name)]
+        assert gene_df.shape[0] > 0, f"There is no gene expression data available for gene(s) at position {gene_name}"
+
+        #get all expression columns corresponding to donors with data in the desired tissue
+        sample_ids = self.samples_per_tissue_dict[self.tissue]
+        gene_df = gene_df[sample_ids]
+        assert len(gene_df.columns) == len(sample_ids)
+        
+        gene_expression_vector[0] = np.mean(gene_df)
+        return gene_expression_vector
+    def generate_train_batch_one_gene(self,region_chr,region_start,region_end,gene_name):
+        """
+        returns reference seq and avg expression (among GTEx ppl) for desired gene
+        
+        """
+        
+        if self.desired_seq_len != 196608: #if using shorter seq len, redefine start and end of region while keeping site of gene TSS centered
+            region_center = region_end - (196608 // 2)
+            region_start = region_center - (self.desired_seq_len // 2)
+            region_end = region_center + (self.desired_seq_len // 2)
+
+        gene_name = gene_name.split('/') #gene_name can be a list of multiple genes overlap TSS bin in the embedding. Splitting converts to a list of 1 gene if none overlap, or multiple genes
+        dna_seq = self._get_ref_seq_for_gene(region_chr,
+                                            region_start,
+                                            region_end)
+
+
+        gene_expression = self._get_avg_GTEx_gene_expr(gene_name)
+
+          
+        return dna_seq,gene_expression
+    
+    def __getitem__(self, idx):
+                       
+                       
+        region_row = self.region_rows_in_epoch[idx]
+        dna_vector, expression_vector = self.generate_train_batch_one_gene(
+                                                                            region_row['seqnames'],
+                                                                            region_row['starts'],
+                                                                            region_row['ends'],
+                                                                            region_row['gene_name'],
+                                                                            )
+ 
+        return dna_vector, expression_vector, region_row['gene_name'],idx
+    def __len__(self):
+        return len(self.region_rows_in_epoch) #returns one reference sequence per gene
+
+class CustomDistributedSampler(DistributedSampler):
+    def __init__(self, dataset, shuffle = False,  **kwargs):
+        super().__init__(dataset, shuffle = shuffle, **kwargs)
+        self.dataset = dataset
+        self.num_total_genes = len(self.dataset.genomic_regions_df)
+        self.num_individuals_per_gene = self.dataset.num_individuals_per_gene
+        self.n_gene_replicate_batches_per_epoch_per_replica = self.dataset.n_gene_replicate_batches_per_epoch 
+
+
+        self.genes_per_replica = self.num_total_genes // self.num_replicas #this calculcates the number of complete groups per GPU. Any extras are ignored
+        self.genes_per_replica = self.genes_per_replica * self.n_gene_replicate_batches_per_epoch_per_replica #With gradient accumulation, the same gene is repeated in different batches until the effective batch size is achieved. Then, the same thing could repeat multiple times for the same genes if there are enough people. Thus, if there are 3 genes but enough ppl to achieve the effective batch size 4x, it is equiavlent to ther ebeing 12 genes
+        self.num_samples_per_replica = self.genes_per_replica * self.num_individuals_per_gene
+
+        print(f"Effective genes_per_replica: {self.genes_per_replica}",f"num_individuals_per_gene: {self.num_individuals_per_gene}",dataset)
+
+        print(f"CustomDistributedSampler Expected # of devices: {self.num_replicas}")
+
+    def __iter__(self):
+        """ 
+        This is called once per epoch and is not shuffled, because the order of genes and people will be shuffled by the dataset object at each epoch. Instead, these
+        indices are kept the same to ensure the data ordering by the dataset is maintained, and each batch only contains samples of one gene on each gpu
+        
+        How this works: Suppose I have 937 genes, and want each GPU to be trained using data from 6 people for the same gene per batch. And I have 4 GPUs. 
+        Each GPU will be assigned 937 //4 = 234 genes. One gene will be ignored.
+        For a GPU 0 will be assigned indices 0 to 1403, GPU1 will get 1404 to 1807 etc Because:
+        For GPU 0 the start group will be 0 * 234 = 0 and the end group will be 0 + 234 = 234. The indices will be extended by 6 for each element from 0->234, yielding a list that spans 0 to 1403 (inclusive)
+        For GPU 1 the start group will be 234 and the end group will be 468. And so forth
+        The final GPU will span 4212 to 5615 (inclusive) because the last gene is dropped, since there is not 3 other genes (one per GPU)
+        Then, each batch, indices 0-6 will be sampled, then 7-12 and so on. The dataset is organized such that this yields samples for a given gene.
+
+
+        if use_all_ppl is True, and dataset.n_gene_replicate_batches_per_epoch >1, it is possible that some genes won't see all people in the batch (But they will always see a multiple of num_individuals_per_gene). 
+        This is beacuse, instead of certain genes being ommitted to make things even across the replicas, certain gradient accumulated batches of length (num_individuals_per_gene) for certain genes may be ommitted instead.
+
+        If use all_pppl is true then the same gene may appear on different GPUs, but only as different gradient accumulated effective batches
+        """
+        # Start and end index of groups for this replica
+        start_group = self.rank * self.genes_per_replica
+        end_group = start_group + self.genes_per_replica
+
+        #indices that will only include genes (and people for those genes) that are meant to be run by one GPU. Ensures you only get one gene per batch for a GPU
+        indices = []
+        for group in range(start_group, end_group):
+            group_start_idx = group * self.num_individuals_per_gene 
+            indices.extend(range(group_start_idx, group_start_idx + self.num_individuals_per_gene )) #add next self.num_individuals_per_gene indices until you reach the end of the group
+
+        assert len(indices) == self.num_samples_per_replica, f"Length of indices per GPU ({len(indices)}) is not the same as the number of Genes x number of people ({self.num_samples_per_replica}) per gene assigned to the GPU"
+        return iter(indices)
+        
+
+    def __len__(self):
+        return self.num_samples_per_replica
+
+
+class CustomDataModule(LightningDataModule):
+    def __init__(self, train_dataset, valid_dataset,test_dataset,train_batch_size):
+        super().__init__()
+        self.train_dataset = train_dataset
+        self.valid_dataset = valid_dataset
+        self.test_dataset = test_dataset
+        self.train_batch_size = train_batch_size
+
+    def setup(self, stage=None):
+        pass
+
+    def train_dataloader(self):
+        print(f"world size: {self.trainer.world_size}")
+        return DataLoader(self.train_dataset, batch_size=self.train_batch_size, shuffle=False,sampler = CustomDistributedSampler(self.train_dataset,shuffle=False))
+
+    def val_dataloader(self):
+        return DataLoader(self.valid_dataset, batch_size= 1, shuffle=False, sampler = CustomDistributedSampler(self.valid_dataset,shuffle=False)),
+        
+    def test_dataloader(self):
+        return DataLoader(self.test_dataset, batch_size= 1, shuffle=False, sampler = CustomDistributedSampler(self.test_dataset,shuffle=False)),
+    
 
 if __name__ == "__main__":
     pass

@@ -6,7 +6,7 @@ import lightning.pytorch as pl
 from enformer_pytorch.finetune import HeadAdapterWrapper
 from enformer_pytorch import Enformer
 from torchmetrics.regression import PearsonCorrCoef,R2Score
-
+import csv
 
 def masked_mse(y_hat,y):
     """
@@ -55,6 +55,12 @@ class LitModel(pl.LightningModule):
         self.learning_rate = learning_rate
         self.alpha = alpha
         self.ensure_no_gene_overlap()
+        self.train_gene_log = {}
+        self.train_donor_log = {}
+        self.valid_gene_log = {}
+        self.valid_donor_log = {}
+        self.test_gene_log = {}
+        self.test_donor_log = {}
 
     def ensure_no_gene_overlap(self):
         """
@@ -104,6 +110,7 @@ class LitModel(pl.LightningModule):
         y_hat = self.predict_step(batch,batch_idx)
         loss = self.loss_fn(y_hat, y) 
         self.log('train_loss',loss,batch_size = y.shape[0], on_step = False, on_epoch = True) #accumulates loss over the epoch and only logs the average at the end, to reduce logging overhead
+        self.sanity_check_multi_gpu_train(genes,donor)
         return {'loss': loss}
     
     def save_eval_results(self,y_hat,y,donor,rank,gene_name):
@@ -132,7 +139,7 @@ class LitModel(pl.LightningModule):
         rank = self.trainer.global_rank
         y_hat = self.predict_step(batch,batch_idx)
         self.save_eval_results(y_hat,y,donor,rank,gene_name) #results for each person are stored and then loss/r2/pcc will be computed at the end of the epoch using all individuals via MetricLogger Callback
-
+        self.sanity_check_multi_gpu_valid(gene_name,donor)
     def test_step(self, batch, batch_idx,dataloader_idx = 0):
         x, y,gene_name,donor,_ = batch
         gene_name = gene_name[0] #expected batch size is 1 for test loop
@@ -140,16 +147,70 @@ class LitModel(pl.LightningModule):
         rank = self.trainer.global_rank
         y_hat = self.predict_step(batch,batch_idx)
         self.save_eval_results(y_hat,y,donor,rank,gene_name)
-
+        self.sanity_check_multi_gpu_test(gene_name,donor)
     def on_train_epoch_end(self):
         self.train_dataset.shuffle_and_define_epoch() #shuffle dataset. Ensures this occurs on the main process even if num_workers > 0
+        print(f"train keys: {self.train_gene_log.keys()}")
+        print(f"valid keys: {self.valid_gene_log.keys()}")
+        print(f"test keys: {self.test_gene_log.keys()}")
 
-    
+        for rank in self.train_gene_log.keys():
+            with open(os.path.join(self.save_dir,f"TrainGenes_Rank{rank}_Epoch{self.current_epoch}.csv"),'w') as f:
+                wr = csv.writer(f)
+                wr.writerows(self.train_gene_log[rank])
+            with open(os.path.join(self.save_dir,f"TrainDonors_Rank{rank}_Epoch{self.current_epoch}.csv"),'w') as f:
+                wr = csv.writer(f)
+                wr.writerows(self.train_donor_log[rank])
+        for rank in self.valid_gene_log.keys():
+            with open(os.path.join(self.save_dir,f"ValidGenes_Rank{rank}_Epoch{self.current_epoch}.csv"),'w') as f:
+                wr = csv.writer(f)
+                wr.writerows(self.valid_gene_log[rank])
+            with open(os.path.join(self.save_dir,f"ValidDonors_Rank{rank}_Epoch{self.current_epoch}.csv"),'w') as f:
+                wr = csv.writer(f)
+                wr.writerows(self.valid_donor_log[rank])
+        for rank in self.test_gene_log.keys():
+            with open(os.path.join(self.save_dir,f"TestGenes_Rank{rank}_Epoch{self.current_epoch}.csv"),'w') as f:
+                wr = csv.writer(f)
+                wr.writerows(self.test_gene_log[rank])
+            with open(os.path.join(self.save_dir,f"TestDonors_Rank{rank}_Epoch{self.current_epoch}.csv"),'w') as f:
+                wr = csv.writer(f)
+                wr.writerows(self.test_donor_log[rank])
+        self.train_gene_log = {}
+        self.train_donor_log = {}
+        self.valid_gene_log = {}
+        self.valid_donor_log = {}
+        self.test_gene_log = {}
+        self.test_donor_log = {}
     def configure_optimizers(self):
         optimizer = torch.optim.AdamW(self.parameters(), lr = self.learning_rate)
         return {
             'optimizer': optimizer
         }
+    def sanity_check_multi_gpu_train(self,genes,donor):
+        """
+        Write names of genes and donors being passed in per batch on each rank to a file
+        """
+        rank = self.trainer.global_rank
+        if rank not in self.train_gene_log.keys():
+            self.train_gene_log[rank] = []
+            self.train_donor_log[rank] = []
+        self.train_gene_log[rank].append(list(genes))
+        self.train_donor_log[rank].append(list(donor))
+
+    def sanity_check_multi_gpu_valid(self,genes,donor):
+        rank = self.trainer.global_rank
+        if rank not in self.valid_gene_log.keys():
+            self.valid_gene_log[rank] = []
+            self.valid_donor_log[rank] = []
+        self.valid_gene_log[rank].append(list(genes))
+        self.valid_donor_log[rank].append(list(donor))
+    def sanity_check_multi_gpu_test(self,genes,donor):
+        rank = self.trainer.global_rank
+        if rank not in self.test_gene_log.keys():
+            self.test_gene_log[rank] = []
+            self.test_donor_log[rank] = []
+        self.test_gene_log[rank].append(list(genes))
+        self.test_donor_log[rank].append(list(donor))
     
 class LitModelHeadAdapterWrapper(LitModel):
     def __init__(self, tissues_to_train,save_dir,train_dataset,learning_rate,alpha,genes_for_training,genes_for_valid,genes_for_test):
@@ -220,8 +281,16 @@ class MetricLogger(pl.Callback):
         rank_df = pd.DataFrame(pl_module.rank_dict)
         rank_df = rank_df.reset_index(names = 'tissue').melt(id_vars = ['tissue'],var_name = 'gene',value_name = 'rank')
         rank_df = rank_df.explode('rank')
+        print(f"pred: {pred_df.index.is_unique}")
+        print(f"rank: {rank_df.index.is_unique}")
+        print(f"donor: {donor_df.index.is_unique}")
+        print(f"target: {target_df.index.is_unique}")
 
-        df = pd.concat([pred_df,target_df[['y_true']],donor_df[['donor']],rank_df[['rank']]],axis = 1)
+        pred_df.to_csv(os.path.join(pl_module.save_dir,"pred_df.csv"),index = False)
+        target_df.to_csv(os.path.join(pl_module.save_dir,"target_df.csv"),index = False)
+        donor_df.to_csv(os.path.join(pl_module.save_dir,"donor_df.csv"),index = False)
+        rank_df.to_csv(os.path.join(pl_module.save_dir,"rank_df.csv"),index = False)  
+        df = pd.concat([pred_df.reset_index(),target_df[['y_true']].reset_index(),donor_df[['donor']].reset_index(),rank_df[['rank']].reset_index()],axis = 1)
         df['end_of_epoch'] = self.epoch
         # trainer.logger.experiment.log({'PredictionResults':wandb.Table(dataframe = df)})
         df.to_csv(os.path.join(pl_module.save_dir,f"Prediction_Results_{self.epoch}_in_{donor_split}_donors.csv"), index=False)

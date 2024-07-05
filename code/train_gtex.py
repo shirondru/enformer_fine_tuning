@@ -139,7 +139,8 @@ def load_trainer(config):
         callbacks = [checkpoint_callback,metric_logger,early_stopper],
         logger = WandbLogger(),
         num_sanity_val_steps = 0, #don't do any validation before training, as all sorts of R2 metrics will be computed during callbacks. Could lead to error with small sample size
-        log_every_n_steps = 1
+        log_every_n_steps = 1,
+        check_val_every_n_epoch = config.valid_metrics_save_freq
     )
     return trainer
 def load_callbacks(config):
@@ -155,7 +156,7 @@ def load_callbacks(config):
             monitor = monitor,
             mode = mode
         )
-    early_stopper = EarlyStopping(monitor = monitor, mode = mode, min_delta = 0, patience = 20)
+    early_stopper = EarlyStopping(monitor = monitor, mode = mode, min_delta = 0, patience = int(config.patience))
     metric_logger = MetricLogger()
     return metric_logger,early_stopper,checkpoint_callback
 def train_gtex(config: wandb.config,

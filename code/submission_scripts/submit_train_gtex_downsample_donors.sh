@@ -1,13 +1,14 @@
 #!/bin/bash
 #SBATCH -p gidbkb
 #SBATCH --nodes=1
-#SBATCH --gpus-per-node=8
-#SBATCH --ntasks-per-node=8
+#SBATCH --gpus-per-node=1
+#SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-gpu=8
-#SBATCH --mem=1000G
+#SBATCH --mem=100G
 #SBATCH -o /pollard/data/projects/sdrusinsky/enformer_fine_tuning/logs/train/slurm_stdout/%j.out
 #SBATCH -e /pollard/data/projects/sdrusinsky/enformer_fine_tuning/logs/train/slurm_stderr/%j.err
-#SBATCH --job-name=AllGenes
+#SBATCH --job-name=DownsampleTrainDonors
+#SBATCH --nodelist=arrietty-h100-gpu02
 
 eval "$(/pollard/home/sdrusinsky/miniforge3/bin/conda shell.bash hook)"
 source /pollard/home/sdrusinsky/miniforge3/bin/activate test_pt231
@@ -21,7 +22,11 @@ cd ..
 echo $SCRIPT_PATH
 echo $(pwd)
 
-script_path=./train_gtex_all_genes.py
-config_path=$1
-fold=$2
-srun python $script_path --config $config_path --fold $fold
+fold=$1
+config_path=./configs/blood_config.yaml
+model_type=SingleGene
+script_path=./train_gtex_downsample_donors.py
+
+for downsample_frac in 1 2 3 4; do
+    python $script_path --config_path $config_path --fold $fold --model_type $model_type --downsample_frac $downsample_frac
+done

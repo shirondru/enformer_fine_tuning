@@ -278,10 +278,12 @@ class EvalAcrossGeneDataset(GTExDataset):
                  DATA_DIR): 
         assert len(tissues_to_train) == 1, "This class only supports evaluation across genes 1 gene at a time"
         self.tissue = tissues_to_train[0]
-        donor_list_path = os.path.join(DATA_DIR,"All_GTEx_ID_list.txt") #not using list of donors. Just Reference Genome. So donor list path includes all GTEx individuals so I take average expression among all of them
+        donor_list_path = os.path.join(DATA_DIR,"cross_validation_folds/gtex/All_GTEx_ID_list.txt") #not using list of donors. Just Reference Genome. So donor list path includes all GTEx individuals so I take average expression among all of them
         num_individuals_per_gene = 1 #one reference genome per gene
         super().__init__(tissues_to_train,requested_regions,desired_seq_len,num_individuals_per_gene,donor_list_path,gene_expression_df,DATA_DIR)
         self.ref_seq_open = pysam.Fastafile(os.path.join(self.DATA_DIR,"hg38_genome.fa")) #keep ref seq open to use to switch variants to reference allele (i.e, mask them)
+        self.metadata = pd.read_csv(os.path.join(self.DATA_DIR,"GTEx_Analysis_v8_Annotations_SampleAttributesDS.txt"),sep='\t')
+        self.samples_per_tissue_dict = self.get_sample_ids_for_tissue()
 
     def shuffle_and_define_epoch(self):
         self.genomic_regions_df = self.genomic_regions_df.sample(frac=1).reset_index(drop=True) #shuffle dataset. Keep this here so the dataset shuffling within litmodel.on_train_epoch_end persists
@@ -290,6 +292,24 @@ class EvalAcrossGeneDataset(GTExDataset):
         for i in range(0, len(self.genomic_regions_df), 1):
             self.region_rows_in_epoch.append(self.genomic_regions_df.iloc[i])
 
+    def get_sample_ids_for_tissue(self):
+        """
+        Returns a dictioanry showing sample IDs from among the 838 GTEx Individuals with RNA-seq + WGS in each tissue
+        """
+        gene_expression_df_cols = list(self.gene_expression_df.columns)
+        samples_per_tissue_dict = {} #contains sample IDs (same as in gene expression df columns) for every person with WGS in each tissue
+        with open(self.donor_list_path, 'r') as f:
+            file = f.read()
+            GTEx_data_split_IDs = file.split("\n")
+            GTEx_data_split_IDs = [ID for ID in GTEx_data_split_IDs if ID != '']  # remove any empty strings, if they exist
+                #add list to dictionary containing GTEx donors with WGS + RNA-seq for this tissue
+        for tissue in self.tissues_to_train:
+            tissue_metadata_ids = self.metadata[self.metadata['SMTSD'] == tissue]['SAMPID'].tolist() #list of sample IDs with data from this tissue 
+            tissue_gene_expression_ids = [x for x in gene_expression_df_cols if x in tissue_metadata_ids] #list of sample IDs with RNA-seq in this tissue
+            sample_ids_with_tissue_data = [item for item in tissue_gene_expression_ids if any(substring in item for substring in GTEx_data_split_IDs)] #list of sample IDs with RNA-seq in this tissue AND WGS data in the data split
+            samples_per_tissue_dict[tissue] = sample_ids_with_tissue_data
+        
+        return samples_per_tissue_dict
     def _get_ref_seq_for_gene(self, region_chr,region_start,region_end):
         ref_seq = self.ref_seq_open.fetch(region_chr, region_start, region_end).upper()
         return self._one_hot_encode(ref_seq)
@@ -338,8 +358,8 @@ class EvalAcrossGeneDataset(GTExDataset):
                                                                             region_row['ends'],
                                                                             region_row['gene_name'],
                                                                             )
- 
         return dna_vector, expression_vector, region_row['gene_name'],idx
+        
     def __len__(self):
         return len(self.region_rows_in_epoch) #returns one reference sequence per gene
 
@@ -410,13 +430,13 @@ class CustomDataModule(LightningDataModule):
 
     def train_dataloader(self):
         print(f"world size: {self.trainer.world_size}")
-        return DataLoader(self.train_dataset, batch_size=self.train_batch_size, shuffle=False,sampler = CustomDistributedSampler(self.train_dataset,shuffle=False))
+        return DataLoader(self.train_dataset, batch_size=self.train_batch_size,num_workers = 8, shuffle=False,sampler = CustomDistributedSampler(self.train_dataset,shuffle=False))
 
     def val_dataloader(self):
-        return DataLoader(self.valid_dataset, batch_size= 1, shuffle=False, sampler = CustomDistributedSampler(self.valid_dataset,shuffle=False)),
+        return DataLoader(self.valid_dataset, batch_size= 1, shuffle=False,num_workers = 8, sampler = CustomDistributedSampler(self.valid_dataset,shuffle=False)),
         
     def test_dataloader(self):
-        return DataLoader(self.test_dataset, batch_size= 1, shuffle=False, sampler = CustomDistributedSampler(self.test_dataset,shuffle=False)),
+        return DataLoader(self.test_dataset, batch_size= 1, shuffle=False,num_workers = 8, sampler = CustomDistributedSampler(self.test_dataset,shuffle=False)),
     
 
 if __name__ == "__main__":

@@ -71,22 +71,27 @@ def ensure_no_donor_overlap(train_ds,val_ds,test_ds):
 
 
 def define_donor_paths(config,dataset):
-    if dataset == 'gtex':
-        donor_dir = os.path.join(config.DATA_DIR,'cross_validation_folds',dataset,'cv_folds')
-        config.update({'train_donor_path':os.path.join(donor_dir,f"person_ids-train-fold{config.fold}.txt")})
-        config.update({'valid_donor_path':os.path.join(donor_dir,f"person_ids-val-fold{config.fold}.txt")})
-        config.update({'test_donor_path':os.path.join(donor_dir,f"person_ids-test-fold{config.fold}.txt")})
-    elif dataset == 'rosmap':
-        #train and validation set are from rosmap. Test set will be individuals from gtex to enable cross-cohort evaluation
-        rosmap_dir = os.path.join(config.DATA_DIR,'cross_validation_folds',dataset)
-        config.update({'train_donor_path':os.path.join(rosmap_dir,f"person_ids-train-fold{config.fold}.txt")})
-        config.update({'valid_donor_path':os.path.join(rosmap_dir,f"person_ids-val-fold{config.fold}.txt")})
-
-        #using all individuals from gtex as test set. Dataset will keep only those with brain cortex data.
-        all_gtex_donor_path = os.path.join(config.DATA_DIR,'cross_validation_folds','gtex','All_GTEx_ID_list.txt')
-        config.update({'test_donor_path' : all_gtex_donor_path}) 
+    #if donor paths already defined, use them, otherwise generate them based on the fold and the dataset
+    if hasattr(config,'train_donor_path'):
+        assert hasattr(config,'valid_donor_path')
+        assert hasattr(config,'test_donor_path')
     else:
-        raise Exception(f"Dataset: {dataset} not supported!")
+        if dataset == 'gtex':
+            donor_dir = os.path.join(config.DATA_DIR,'cross_validation_folds',dataset,'cv_folds')
+            config.update({'train_donor_path':os.path.join(donor_dir,f"person_ids-train-fold{config.fold}.txt")})
+            config.update({'valid_donor_path':os.path.join(donor_dir,f"person_ids-val-fold{config.fold}.txt")})
+            config.update({'test_donor_path':os.path.join(donor_dir,f"person_ids-test-fold{config.fold}.txt")})
+        elif dataset == 'rosmap':
+            #train and validation set are from rosmap. Test set will be individuals from gtex to enable cross-cohort evaluation
+            rosmap_dir = os.path.join(config.DATA_DIR,'cross_validation_folds',dataset)
+            config.update({'train_donor_path':os.path.join(rosmap_dir,f"person_ids-train-fold{config.fold}.txt")})
+            config.update({'valid_donor_path':os.path.join(rosmap_dir,f"person_ids-val-fold{config.fold}.txt")})
+
+            #using all individuals from gtex as test set. Dataset will keep only those with brain cortex data.
+            all_gtex_donor_path = os.path.join(config.DATA_DIR,'cross_validation_folds','gtex','All_GTEx_ID_list.txt')
+            config.update({'test_donor_path' : all_gtex_donor_path}) 
+        else:
+            raise Exception(f"Dataset: {dataset} not supported!")
 
 
 def load_gtex_datasets(config,train_genes,valid_genes,test_genes):
@@ -146,8 +151,10 @@ def load_trainer(config):
 def load_callbacks(config):
     checkpoint_dir = os.path.join(config.save_dir,'checkpoints')
     os.makedirs(checkpoint_dir,exist_ok = True)
-
-    monitor = 'mean_r2_across_train_genes_across_valid_donors'
+    if hasattr(config,'monitor'):
+        monitor = config.monitor
+    else:
+        monitor = 'mean_r2_across_train_genes_across_valid_donors'
     mode = 'max'
 
     checkpoint_callback =  ModelCheckpoint(

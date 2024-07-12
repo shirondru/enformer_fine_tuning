@@ -16,7 +16,8 @@ def load_trainer_multi_gpu(config):
         accelerator="gpu", 
         devices=int(config.n_gpus), 
         check_val_every_n_epoch = config.valid_metrics_save_freq,
-        strategy="ddp_find_unused_parameters_true",
+        strategy="ddp_find_unused_parameters_true", ## HeadAdapterWrapper has unused parameters
+        # strategy = 'ddp
     )
     assert trainer.world_size > 1,"This script is for multi-gpu training. Increase config.n_gpus"
     return trainer
@@ -41,7 +42,11 @@ def train_gtex_multi_gpu(config: wandb.config,
         test_genes
     )
     trainer = load_trainer_multi_gpu(config)
-    trainer.fit(model = model, datamodule = data_module) 
+
+    if hasattr(config,'train_ckpt_resume_path'): #resume training from desired ckpt path, in case job ran out of time on SLURM or crashed etc
+        trainer.fit(model = model, datamodule = data_module,ckpt_path = config.train_ckpt_resume_path) 
+    else:
+        trainer.fit(model = model, datamodule = data_module) 
     trainer.test(model, datamodule=data_module, ckpt_path = 'best')
 
 

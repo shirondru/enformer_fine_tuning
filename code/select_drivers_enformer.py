@@ -28,8 +28,23 @@ def main():
     """
     parser = argparse.ArgumentParser(description="Select Drivers from ISM attributions")
     parser.add_argument("--driver_method",type=str)
+    parser.add_argument("--select_drivers",type=str)
+    parser.add_argument("--evaluate_drivers",type=str)
+    parser.add_argument("--skip_finished_runs",type=str)
     args = parser.parse_args()
     driver_method = args.driver_method
+    select_drivers = args.select_drivers.lower()
+    evaluate_drivers = args.evaluate_drivers.lower()
+    skip_finished_runs = args.skip_finished_runs.lower()
+    assert driver_method in ['forward_selection','forward_selection_with_only_drivers']
+    assert select_drivers in ['false','true']
+    assert evaluate_drivers in ['false','true']
+
+    #will skip all runs where a directory for drivers has been made (even if the results haven't been generated)
+    if skip_finished_runs == 'true':
+        finished_runs = os.listdir(os.path.join(outdir,driver_method))
+    else:
+        finished_runs = []
 
     cwd = os.getcwd()
     data_dir = os.path.join(cwd,'../data')
@@ -37,7 +52,6 @@ def main():
     plot_selection = 'drivers'
     outdir = os.path.join(cwd,'../results/EnformerDriverSelection')
     assert str(plot_selection).lower() in ['false','all','drivers']
-    assert driver_method in ['forward_selection','forward_selection_with_only_drivers']
     tissues_to_train = ["CAGE:blood, adult, pool1","CAGE:brain, adult"]
     gene_paths_per_tissue = {
         'CAGE:brain, adult':os.path.join(data_dir,'genes/Brain_Cortex/all_brain_cortex_train_and_test_genes.txt'),
@@ -51,8 +65,6 @@ def main():
 
     n_donor_folds = 3
     ism_result_dir = os.path.join(cwd,'../results/EnformerISM')
-
-    finished_runs = os.listdir(os.path.join(outdir,driver_method)) #
 
     #for each tissue, ISM scores are in the file (ISM scores for each tissue on different rows)
     #So ISM scores for a gene could exist for both tissues but Enformer will only have been evaluated for one tissue. 
@@ -86,7 +98,7 @@ def main():
                         assert model_preds.shape[0] > 0
                         assert model_preds['enformer_tissue'].unique().item() == tissue
                         model_preds = model_preds.rename(columns = {'model_pred':'y_pred'})
-                        select_drivers(ism_results,desired_seq_len,gene_name,donors, model_preds, plot_selection,outdir, driver_method,name)
+                        select_and_evaluate_drivers(ism_results,desired_seq_len,gene_name,donors, model_preds, plot_selection,outdir, driver_method,name,select_drivers,evaluate_drivers)
 
 if __name__ == '__main__':
     main()

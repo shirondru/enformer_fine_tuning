@@ -1,7 +1,6 @@
 from train_gtex import *
 from datasets import CustomDataModule, CustomDistributedSampler
 
-
 def load_trainer_multi_gpu(config):
     metric_logger,early_stopper,checkpoint_callback = load_callbacks(config)
     trainer = Trainer(
@@ -42,7 +41,6 @@ def train_gtex_multi_gpu(config: wandb.config,
         test_genes
     )
     trainer = load_trainer_multi_gpu(config)
-
     if hasattr(config,'train_ckpt_resume_path'): #resume training from desired ckpt path, in case job ran out of time on SLURM or crashed etc
         trainer.fit(model = model, datamodule = data_module,ckpt_path = config.train_ckpt_resume_path) 
     else:
@@ -74,7 +72,10 @@ def main():
     tissue = config['tissues_to_train'].replace(' -','').replace(' ','_').replace('(','').replace(')','')
 
     train_genes = parse_gene_files(os.path.join(DATA_DIR,'genes',tissue,'all_possible_train_genes.txt'))
-    valid_genes = []
+    train_genes = [x for x in train_genes if x not in ['LYNX1','C2orf61']] #two different genes have same name in GENCODE. Remove them
+    
+    
+    valid_genes = parse_gene_files(os.path.join(DATA_DIR,'genes',tissue,'valid_genes.txt'))
     test_genes = parse_gene_files(os.path.join(DATA_DIR,'genes',tissue,'test_genes.txt'))
     wandb_exp_name = config['experiment_name'] + f'_Fold-{fold}'
     wandb.init(

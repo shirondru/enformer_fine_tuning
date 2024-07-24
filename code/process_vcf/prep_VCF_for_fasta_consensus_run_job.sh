@@ -1,8 +1,8 @@
-DATA_DIR=$1 #path to directory containing data; e.g., Whole Genome Sequencing VCF Files
-outdir=$2 #location where BCF/VCF files containing only SNPs will be saved
-log_dir=$3 #where stderr/stdout will go
+vcf_path=$1 #where WGS VCF files are located
+script_dir="$(dirname "${BASH_SOURCE[0]}")"
+log_dir=$script_dir/../../logs/gen_fasta_consensus
 
-job_script=./prep_VCF_for_fasta_consensus_job_script.sh
+job_script=$script_dir/prep_VCF_for_fasta_consensus_job_script.sh
 job_name=CreateSNPOnlyVCFBCF
 log_dir=$log_dir/gen_fasta_consensus
 
@@ -15,4 +15,4 @@ mkdir $log_dir/stdout
 mkdir $log_dir/stderr
 
 
-qsub -cwd  -N $job_name $job_script "$DATA_DIR" "$outdir"
+qsub -cwd  -N $job_name $job_script "$vcf_path"

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -i
 #$ -o /pollard/data/projects/sdrusinsky/enformer_fine_tuning/logs/gen_fasta_consensus/stdout/$JOB_ID.o
 #$ -e /pollard/data/projects/sdrusinsky/enformer_fine_tuning/logs/gen_fasta_consensus/stderr/$JOB_ID.e
 #$ -r y                                                        

@@ -1,4 +1,4 @@
-#!/bin/bash -i
+#!/bin/bash
 #$ -o /pollard/data/projects/sdrusinsky/enformer_fine_tuning/logs/gen_fasta_consensus/stdout/$JOB_ID.o
 #$ -e /pollard/data/projects/sdrusinsky/enformer_fine_tuning/logs/gen_fasta_consensus/stderr/$JOB_ID.e
 #$ -r y                                                        
@@ -6,6 +6,7 @@
 #$ -l scratch=1000G                  
 #$ -l h_rt=168:00:00  
 
+source ~/.bashrc
 
 vcf_dir=$1
 

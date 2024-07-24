@@ -16,7 +16,7 @@ conda env create -f environment.yml #install requirements
 5. (Optional) Follow the [Weights & Biases quickstart](https://docs.wandb.ai/quickstart). W&B is used to track training experiments and metadata from past runs is parsed in subsequent experiments. For example, when performing in silico mutagenesis, information like sequence length, training tissue, and training genes is used. Examples of these metadata files can be found under `code/metadata_from_past_runs`. If you prefer not to use W&B, then (1) all `wandb` calls in python scripts must be removed, (2) `config` files must be restructured within python training scripts, and (3) metadata files should be generated to maintain compatibility.
 6. Pre-process GTEx VCF files and generate consensus sequences from each individual's variant calls. You must [apply](https://gtexportal.org/home/protectedDataAccess) for access before doing this. Code is provided to help do this, using an SGE scheduler:
    
-A) Download hg38 reference genome fasta fila. Install [samtools](http://www.htslib.org/) if necessary.
+A) Download hg38 reference genome fasta file. Install [samtools](http://www.htslib.org/) if necessary.
 ```
 wget -O - http://hgdownload.cse.ucsc.edu/goldenPath/hg38/bigZips/hg38.fa.gz | gunzip -c > ./data/hg38_genome.fa
 samtools faidx ./data/hg38_genome.fa
@@ -25,9 +25,8 @@ B) First pre-process the VCF files, converting them to bcf files and retrieving 
 ```
 DATA_DIR="$(realpath ./data)"
 vcf_path=$DATA_DIR/VCF
-log_dir="$(realpath ./logs)"
 
-sh code/process_vcf/prep_VCF_for_fasta_consensus_run_job.sh $vcf_path $log_dir
+sh code/process_vcf/prep_VCF_for_fasta_consensus_run_job.sh $vcf_path
 ```
 C) Take processed BCF file and generate two consensus sequences for each individual with WGS & RNA-seq data -- one per haplotype.
 ```

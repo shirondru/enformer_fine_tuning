@@ -34,7 +34,16 @@ bcf_in=$vcf_path/GTEx_Analysis_2017-06-05_v8_WholeGenomeSeq_838Indiv_Analysis_Fr
 consensus_outdir=$DATA_DIR/ConsensusSeqs_SNPsOnlyUnphased #absolute path to directory where consensus fasta files will be saved
 sh ./code/process_vcf/gen_fasta_consensus_run_jobs.sh $bcf_in $consensus_outdir $DATA_DIR
 ```
+7. Download gene expression data
+```
+cd ./data/gtex_eqtl_expression_matrix
+wget https://storage.googleapis.com/adult-gtex/bulk-qtl/v8/single-tissue-cis-qtl/GTEx_Analysis_v8_eQTL_expression_matrices.tar
+tar -xvf GTEx_Analysis_v8_eQTL_expression_matrices.tar
 
+#bring data from tissues used in paper to expected location
+mv GTEx_Analysis_v8_eQTL_expression_matrices/Brain_Cortex.v8.normalized_expression.bed.gz .
+mv GTEx_Analysis_v8_eQTL_expression_matrices/Whole_Blood.v8.normalized_expression.bed.gz .
+```
 
 # Example Usage
 To train single-gene and multi-gene Performer models on Whole Blood GTEx data using ~300 genes, run:
@@ -44,5 +53,4 @@ sh .code/submission_scripts/submit_gtex.sh
 This will launch 6 SLURM jobs (3 single-gene & 3 multi-gene; training 3 replicates per model using different train/validation/test folds). Each job will be launched via `code/submission_scripts/slurm_train_gtex.sh`. Please update `slurm_train_gtex.sh` to match your requirements (see requirement #4 above). `slurm_train_gtex.sh` will launch `train_gtex.py` using configurations (e.g., learning rate, training tissue) from `code/configs/blood_config.yaml`. `train_gtex.py` will select the ~300 genes used in the paper and fine-tune Enformer’s pre-trained weights using paired WGS & RNA-seq.
 
 ## TODO:
-1. Code to convert WGS VCF -> consensus sequence fasta
-2. Add point 6 to requirements to process protected data with expected filestructure
+convert GTEx_Analysis_2017-06-05_v8_RNASeQCv1.1.9_gene_tpm.gct.gz -> GTEx_gene_tpm.csv

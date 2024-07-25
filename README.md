@@ -52,5 +52,26 @@ sh .code/submission_scripts/submit_gtex.sh
 ```
 This will launch 6 SLURM jobs (3 single-gene & 3 multi-gene; training 3 replicates per model using different train/validation/test folds). Each job will be launched via `code/submission_scripts/slurm_train_gtex.sh`. Please update `slurm_train_gtex.sh` to match your requirements (see requirement #4 above). `slurm_train_gtex.sh` will launch `train_gtex.py` using configurations (e.g., learning rate, training tissue) from `code/configs/blood_config.yaml`. `train_gtex.py` will select the ~300 genes used in the paper and fine-tune Enformer’s pre-trained weights using paired WGS & RNA-seq.
 
+To modify training hyperparameters, update or create a new config file. Config files are read within the training script (e.g., `train_gtex.py`) and different config parameters can be added within the script. ./code/configs/blood_config.yaml is shown below, see comments for more details on how things can be changed.
+```
+seq_length: 49152 
+learning_rate: 5e-6
+train_batch_size: 32
+num_individuals_per_gene: 128 #gradient accumulation combines 4 effective batches of 32 (above) into 128
+alpha: 0.5 # weight given to MSE within the loss function. The second term gets the complement of this
+experiment_name: "FinalPaperWholeBlood"
+max_epochs: 150
+precision: bf16-mixed
+tissues_to_train: "Whole Blood"
+gradient_clip_val: 0.05
+seed: 0
+patience: 20 #if no improvement to R2 evaluated on training genes from validation donors, exit training
+valid_metrics_save_freq: 1 #evaluate every epoch
+```
+If you were to make a new config file, you could modify submit_gtex.sh to use it instead, or pass it as an argument to the job script (if using a job scheduler) or into the python training script (e.g., `train_gtex.py`) otherwise. See `./code/submission_scripts/slurm_train_gtex.sh` for an example of a SLURM job script. 
+
+To train or evaluate on different genes:
+____
+
 ## TODO:
 convert GTEx_Analysis_2017-06-05_v8_RNASeQCv1.1.9_gene_tpm.gct.gz -> GTEx_gene_tpm.csv

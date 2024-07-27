@@ -9,7 +9,7 @@ precision: bf16-mixed
 tissues_to_train: "Whole Blood"
 gradient_clip_val: 0.05
 seed: 0
-train_gene_path: /pollard/data/projects/sdrusinsky/enformer_fine_tuning/data/genes/Whole_Blood/SingleGene/PPIF.txt
+train_gene_dir: /pollard/data/projects/sdrusinsky/enformer_fine_tuning/data/genes/Whole_Blood/PPIF_only
 valid_gene_path: /pollard/data/projects/sdrusinsky/enformer_fine_tuning/data/genes/empty.txt
 test_gene_path: /pollard/data/projects/sdrusinsky/enformer_fine_tuning/data/genes/empty.txt
 patience: 20

@@ -28,9 +28,9 @@ def prepare_genes(config):
     data_dir = config['DATA_DIR']
     
     #if desired genes to use explicitly defined in config file, use only those
-    if 'train_gene_path' in config:
-        train_gene_filedir = os.path.dirname(config['train_gene_path'])
-        train_gene_filenames = [os.path.basename(config['train_gene_path'])] #script expects a list of filenames
+    if 'train_gene_dir' in config:
+        train_gene_filedir = config['train_gene_dir'] #directory containing txt file(s) of genes
+        train_gene_filenames = os.listdir(train_gene_filedir) #script expects a list of filenames
         valid_genes = parse_gene_files(config['valid_gene_path']) 
         test_genes = parse_gene_files(config['test_gene_path']) 
     else:

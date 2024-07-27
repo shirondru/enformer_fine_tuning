@@ -70,8 +70,7 @@ valid_metrics_save_freq: 1 #evaluate every epoch
 ```
 If you were to make a new config file, you could modify submit_gtex.sh to use it instead, or pass it as an argument to the job script (if using a job scheduler) or into the python training script (e.g., `train_gtex.py`) otherwise. See `./code/submission_scripts/slurm_train_gtex.sh` for an example of a SLURM job script. 
 
-To train or evaluate on different genes:
-____
 
 ## TODO:
+Add example for training on different genes
 convert GTEx_Analysis_2017-06-05_v8_RNASeQCv1.1.9_gene_tpm.gct.gz -> GTEx_gene_tpm.csv

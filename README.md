@@ -1,6 +1,6 @@
 Welcome to the Performer repository! This repository is meant to fine-tune sequence-to-expression models using paired whole genome sequencing (WGS) and gene expression data. We focus on [Enformer](https://www.nature.com/articles/s41592-021-01252-x), although the code used here can be adapted to other models.
 
-Our preprint is out! Find it [here]()
+Our preprint is out! Find it [here](https://www.biorxiv.org/content/10.1101/2024.07.27.605449v1)
 
 NOTE: Not all necessary data is provided in this repository. This is because some of the data is protected (GTEx WGS and ROSMAP data) while other data is large and easily found online (hg38 reference genome). Thus, for this repository to be used as-is, protected data must first be retrieved. This repository can still be used as a starting point for those that do not have access to protected data, or are interested in using different datasets.
 

@@ -74,10 +74,13 @@ fi
 echo haplotype $haplotype
 ## 3. Generate consensus sequence with one haplotype from the VCF.
 bcftools consensus --fasta-ref=$TMPDIR/ref_fasta.fa --haplotype=$haplotype --samples=$sample $TMPDIR/bcf_in.bcf.gz -o $TMPDIR/${sample}_consensus_H${haplotype}.fa 
+samtools faidx $TMPDIR/${sample}_consensus_H${haplotype}.fa 
 echo "bcftools consensus exit status: $?"
 echo result | ls -lhtr . 
 ## 4. Move output files back to global disk
 mv $TMPDIR/${sample}_consensus_H${haplotype}.fa $outdir
+mv $TMPDIR/${sample}_consensus_H${haplotype}.fa.fai $outdir
+
 
 
 qstat -j $JOB_ID

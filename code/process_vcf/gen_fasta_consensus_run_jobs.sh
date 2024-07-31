@@ -1,7 +1,7 @@
 # Submits multiple jobs running gen_fasta_consensus_job_script.sh in parallel, splitting up the task into multiple jobs to get it done faster
 
 script_dir="$(dirname "${BASH_SOURCE[0]}")"
-echo script path $script_path
+echo script path $script_dir
 log_dir=$script_dir/../../logs/gen_fasta_consensus
 
 bcf_in=$1 #absolute path to BCF file containing WGS data from SNPs only generated in prep_VCF_for_fasta_consensus_job_script.sh
@@ -25,5 +25,5 @@ fi
 mkdir $log_dir/stdout
 mkdir $log_dir/stderr
 
-# qsub -cwd -t 1-$total_num_tasks -tc 35 -N $job_name $job_script $bcf_in $bcf_in_idx $outdir
-qsub -cwd -t 1-2 -tc 35 -N $job_name $job_script $bcf_in $bcf_in_idx $outdir $DATA_DIR
+qsub -cwd -t 1-$total_num_tasks -tc 35 -N $job_name $job_script $bcf_in $bcf_in_idx $outdir
+# qsub -cwd -t 1-2 -tc 35 -N $job_name $job_script $bcf_in $bcf_in_idx $outdir $DATA_DIR

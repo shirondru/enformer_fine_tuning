@@ -190,18 +190,29 @@ def load_model(ckpt,save_dir,run_id):
 def main():
     parser = argparse.ArgumentParser(description="For ISM")
     parser.add_argument("--path_to_metadata",type=str,help = "Metadata from Wandb run to ensure correct specifications are used")
-    parser.add_argument("--model_type",type=str, help = 'One of SingleGene or MultiGene')
+    parser.add_argument("--model_type",type=str, help = 'One of SingleGene or MultiGene or OligoGene')
     parser.add_argument("--outdir",type=str,nargs ='?', help = 'Optional directory to save outputs')
     parser.add_argument("--path_to_only_genes_file",type=str,nargs ='?', help = 'Optional path to a txt file containing an explicit set of genes to evaluate. Each gene must be on its own row')
+    parser.add_argument("--subset",type=int,nargs = '?',help = "Metadata enumerating models will be split into n_subsets and this subset of models will be evaluated by the job.")
+    parser.add_argument("--n_subsets",type=int,nargs = '?',help = "Metadata enumerating models will be split into n_subsets.")
+
+    
     args = parser.parse_args()
     metadata = pd.read_csv(args.path_to_metadata)
     outdir = args.outdir
     model_type = args.model_type
     path_to_only_genes_file = args.path_to_only_genes_file
+    subset = args.subset
+    n_subsets = args.n_subsets
     metadata = metadata.rename(columns = {'ID':'run_id'})
     clean_genes(metadata)
-    assert model_type in ['SingleGene','MultiGene']
+    assert model_type in ['SingleGene','MultiGene','OligoGene']
     
+    if n_subsets:
+        n_subsets = int(n_subsets) #ensure read as int
+        subset = int(subset)
+        metadata = np.array_split(metadata,int(n_subsets))[int(subset)]
+
     
 
 
@@ -210,8 +221,9 @@ def main():
     if not outdir:
         outdir = os.path.join(cwd,'../results/PerformerISM')
     enformer_regions = pd.read_csv(os.path.join(data_dir,"Enformer_genomic_regions_TSSCenteredGenes_FixedOverlapRemoval.csv"))
-    pl.seed_everything(0, workers=True)
     for idx, row in metadata.iterrows():
+        seed = int(row['seed'])
+        pl.seed_everything(seed, workers=True)
         run_id = row['run_id']
         tissues_to_train = row['tissues_to_train'].strip('"[]"').split(',') #configure as a list of strings
         assert len(tissues_to_train) == 1, "ISM on only 1 output tissue is supported"

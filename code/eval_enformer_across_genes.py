@@ -38,7 +38,7 @@ def main():
     enformer_regions = pd.read_csv(os.path.join(data_dir,"Enformer_genomic_regions_TSSCenteredGenes_FixedOverlapRemoval.csv"))
     test_genes = list(enformer_regions[(enformer_regions['set'] == 'test') & (~enformer_regions['gene_name'].str.contains('/'))]['gene_name'].unique())
     pl.seed_everything(0, workers=True)
-    filename = os.path.join(outdir,"EvalAcrossTestGenes.csv")
+    filename = os.path.join(outdir,f"EvalAcrossTestGenes_{desired_seq_len}bp.csv")
     enformer = Enformer.from_pretrained(
             'EleutherAI/enformer-official-rough',
             target_length = -1 #disable cropping for use with shorter sequences
@@ -47,7 +47,7 @@ def main():
     enformer.cuda()
     ds = EvalAcrossGeneDataset(tissues_to_train,test_genes,desired_seq_len,gene_expression_df,data_dir)
     dataloader = DataLoader(ds, batch_size = 1 )
-    results_df = pd.DataFrame(columns = ['model','gene','y','y_hat','enformer_tissue','enformer_output_dim'])
+    results_df = pd.DataFrame(columns = ['model','gene','y','y_hat','enformer_tissue','enformer_output_dim','seq_len'])
     enformer_tissue_names,enformer_output_dims = get_enformer_output_dim_from_tissue(tissues_to_train)
 
     with torch.no_grad():
@@ -58,7 +58,7 @@ def main():
                 pred = slice_enformer_pred(pred,n_center_bins)
                 for tissue_str, enformer_output in zip(enformer_tissue_names,enformer_output_dims):
                     final_pred = pred[enformer_output].item()
-                results_df.loc[results_df.shape[0],:] = ['enformer',gene,y.item(),final_pred,tissue_str,enformer_output]
+                results_df.loc[results_df.shape[0],:] = ['enformer',gene,y.item(),final_pred,tissue_str,enformer_output,desired_seq_len]
     results_df.to_csv(filename,index = False)
 
 

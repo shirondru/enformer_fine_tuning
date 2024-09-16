@@ -2,7 +2,7 @@ Welcome to the Performer repository! This repository is meant to fine-tune seque
 
 Our preprint is out! Find it [here](https://www.biorxiv.org/content/10.1101/2024.07.27.605449v1)
 
-NOTE: Not all necessary data is provided in this repository. This is because some of the data is protected (GTEx WGS and ROSMAP data) while other data is large and easily found online (hg38 reference genome). Thus, for this repository to be used as-is, protected data must first be retrieved. This repository can still be used as a starting point for those that do not have access to protected data, or are interested in using different datasets.
+NOTE: Not all necessary data is provided in this repository. This is because some of the data is protected (GTEx WGS and ROSMAP data) while other data can be large and easily found online (hg38 reference genome). Thus, for this repository to be used as-is, certain data must first be retrieved. This repository can still be used as a starting point for those that do not have access to protected data, or are interested in using different datasets.
 
 # Requirements
 1. Clone the repository

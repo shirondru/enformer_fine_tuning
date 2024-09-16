@@ -46,7 +46,7 @@ def prepare_genes(config):
             test_genes = []
     return train_gene_filedir, train_gene_filenames, valid_genes, test_genes
 
-def ensure_no_gene_overlap(train_genes,val_genes,test_genes):
+def ensure_no_gene_overlap(train_genes,val_genes,test_genes,eval_test_gene_during_validation = False):
     train_gene_set = set(train_genes)
     valid_gene_set = set(val_genes)
     test_gene_set = set(test_genes)
@@ -57,8 +57,10 @@ def ensure_no_gene_overlap(train_genes,val_genes,test_genes):
 
     assert len(list(train_valid_overlap)) == 0, f"There is overlap between genes in the train and valid set via the following genes {train_valid_overlap}"
     assert len(list(train_test_overlap)) == 0, f"There is overlap between genes in the train and test set via the following genes {train_test_overlap}"
-    assert len(list(valid_test_overlap)) == 0, f"There is overlap between genes in the valid and test set via the following genes {valid_test_overlap}"
     assert len(train_genes) > 0, "You have no genes to train on!"
+    if not eval_test_gene_during_validation:
+        assert len(list(valid_test_overlap)) == 0, f"There is overlap between genes in the valid and test set via the following genes {valid_test_overlap}"
+
 
 def ensure_no_donor_overlap(train_ds,val_ds,test_ds):
     train_set = set(train_ds.individuals_in_split)
@@ -169,8 +171,10 @@ def load_callbacks(config):
 def train_gtex(config: wandb.config,
                train_genes: list, 
                valid_genes: list,
-               test_genes: list) -> None:
-    ensure_no_gene_overlap(train_genes,valid_genes,test_genes)
+               test_genes: list,
+               eval_test_gene_during_validation: bool = False,
+               validate_first: bool = False) -> None:
+    ensure_no_gene_overlap(train_genes,valid_genes,test_genes,eval_test_gene_during_validation)
     define_donor_paths(config,'gtex')
 
     train_ds, valid_ds, test_ds = load_gtex_datasets(config,train_genes, valid_genes,test_genes)
@@ -182,9 +186,12 @@ def train_gtex(config: wandb.config,
         config.alpha,
         train_genes,
         valid_genes,
-        test_genes
+        test_genes,
+        eval_test_gene_during_validation
     )
     trainer = load_trainer(config)
+    if validate_first:
+        trainer.validate(model = model, dataloaders = DataLoader(valid_ds, batch_size = 1))
     trainer.fit(model = model,
                 train_dataloaders = DataLoader(train_ds,batch_size = config.train_batch_size),
                 val_dataloaders = DataLoader(valid_ds, batch_size = 1) #code for logging and storing validation/test results expects batch size of 1 for these 

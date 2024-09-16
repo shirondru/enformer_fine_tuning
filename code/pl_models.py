@@ -38,7 +38,7 @@ def remove_l_tri_flatten_3d(diff):
     return flat[~torch.isnan(flat)]
 
 class LitModel(pl.LightningModule):
-    def __init__(self,tissues_to_train,save_dir,train_dataset,learning_rate,alpha,genes_for_training,genes_for_valid,genes_for_test):
+    def __init__(self,tissues_to_train,save_dir,train_dataset,learning_rate,alpha,genes_for_training,genes_for_valid,genes_for_test,eval_test_gene_during_validation = False):
         super(LitModel, self).__init__()
         self.save_hyperparameters()
         self.pred_dict = {}
@@ -53,9 +53,9 @@ class LitModel(pl.LightningModule):
         self.genes_for_test = genes_for_test
         self.learning_rate = learning_rate
         self.alpha = alpha
-        self.ensure_no_gene_overlap()
+        self.ensure_no_gene_overlap(eval_test_gene_during_validation)
 
-    def ensure_no_gene_overlap(self):
+    def ensure_no_gene_overlap(self,eval_test_gene_during_validation):
         """
         Since it can be valuable to evaluate train genes on held out people -- to understand the extent to which the model has learned to predict loci it has seen in unseen people with unseen variants --
         It complicates the train/valid/test split of genes, because validation and test datalaoders may contain train genes (in principle). 
@@ -63,10 +63,7 @@ class LitModel(pl.LightningModule):
         To deal with this, I ensure here that the genes in the train dataset are only the desired train genes. During the validation and test loops, since evaluations
         may be performed on train/valid/test genes, I denote which are which using class attributes. These are accessed within the ValidMetricLogger Callback, and when this object calculates performance on these genes, 
         it labels them as train,valid, or test genes accordingly. Therefore, I triple check here, once again, that there is no overlap between these genes
-        Within the `train_full_enformer function`, I also call `final_check_ensure_no_gene_or_person_leakage_in_datasets` to ensure the genes being used in each of these datasets follow these conventions.
         
-        Ensuring that there is no overlap between genes for training and genes for valid and genes for test ensures genes cannot have more than 1 label, or have conflicting labels, during evaluation in ValidMetricLogger
-        `final_check_ensure_no_gene_or_person_leakage_in_datasets` Will check to ensure the genes coming from these datalaoders align with these labels (while being flexible to the fact that, for example, the valid datalaoder can yield train *And* valid genes)
         """
         train_gene_set = set(self.genes_for_training)
         valid_gene_set = set(self.genes_for_valid)
@@ -78,7 +75,8 @@ class LitModel(pl.LightningModule):
 
         assert len(list(train_valid_overlap)) == 0, f"There is overlap between genes in the train and valid set via the following genes {train_valid_overlap}"
         assert len(list(train_test_overlap)) == 0, f"There is overlap between genes in the train and test set via the following genes {train_test_overlap}"
-        assert len(list(valid_test_overlap)) == 0, f"There is overlap between genes in the valid and test set via the following genes {valid_test_overlap}"
+        if not eval_test_gene_during_validation:
+            assert len(list(valid_test_overlap)) == 0, f"There is overlap between genes in the valid and test set via the following genes {valid_test_overlap}"
 
         assert len(self.genes_for_training) > 0, "You have no genes to train on!"
 
@@ -148,8 +146,8 @@ class LitModel(pl.LightningModule):
         }
     
 class LitModelHeadAdapterWrapper(LitModel):
-    def __init__(self, tissues_to_train,save_dir,train_dataset,learning_rate,alpha,genes_for_training,genes_for_valid,genes_for_test):
-        super().__init__(tissues_to_train,save_dir,train_dataset,learning_rate,alpha,genes_for_training,genes_for_valid,genes_for_test)
+    def __init__(self, tissues_to_train,save_dir,train_dataset,learning_rate,alpha,genes_for_training,genes_for_valid,genes_for_test,eval_test_gene_during_validation = False):
+        super().__init__(tissues_to_train,save_dir,train_dataset,learning_rate,alpha,genes_for_training,genes_for_valid,genes_for_test,eval_test_gene_during_validation)
 
         enformer = Enformer.from_pretrained(
             'EleutherAI/enformer-official-rough',

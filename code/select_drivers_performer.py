@@ -9,6 +9,11 @@ import sys
 from ism_performer import *
 import argparse
 
+#import warning that will happen if model predicts same value for every person (when model is really bad at a gene)
+#or if nobody (or everybody) has a particular snp during driver analysis
+import warnings
+from scipy.stats import ConstantInputWarning
+warnings.filterwarnings("ignore", category=ConstantInputWarning)
 
 def get_genotypes(gene,window,donors):
     cwd = os.getcwd()
@@ -41,7 +46,7 @@ def get_genotypes(gene,window,donors):
     else:
         raise Exception(f"Gene {gene} not in enformer regions")
 
-def plot_driver_selection(sum_attr_x_genotype, snp_attr_x_genotype,forward_sum_attr_x_genotype, model_preds,  peartot, snp_pearson,pearson_forward, outdir,i):
+def plot_driver_selection(sum_attr_x_genotype, snp_attr_x_genotype,forward_sum_attr_x_genotype, model_preds,  peartot, snp_pearson,pearson_forward, model_outdir,i,filename):
     # fig,axes = plt.figure(figsize = (4,4))
     # ax = fig.add_subplot(111)
     fig, axes = plt.subplots(3, 1,sharex = True, sharey = True,figsize = (12,12))
@@ -57,15 +62,15 @@ def plot_driver_selection(sum_attr_x_genotype, snp_attr_x_genotype,forward_sum_a
     axes[2].scatter(forward_sum_attr_x_genotype,model_preds['y_pred'], color = 'navy')
     axes[2].set_title(f"Linear Approximation Using Current Sum of SNPs: {round(pearson_forward,2)}")
    
-    
-    save_path = os.path.join(outdir,"DriverSelectionFigures")
+    parsed_filename = filename.split('.csv')[0]
+    save_path = os.path.join(model_outdir,"DriverSelectionFigures",parsed_filename)
     if not os.path.isdir(save_path):
-        os.mkdir(save_path)
+        os.makedirs(save_path)
 
     plt.tight_layout()
     fig.savefig(os.path.join(save_path,f"DriverSelection_{i}.png"),dpi = 200, bbox_inches = 'tight')
     plt.close()
-def forward_selection(peartot,attr_x_genotype,plot_selection,model_preds,outdir,sum_attr_x_genotype):
+def forward_selection(peartot,attr_x_genotype,plot_selection,model_preds,model_outdir,sum_attr_x_genotype,filename):
     """
     Adapted from https://github.com/mostafavilabuw/EnformerAssessment/blob/main/enformer_analysis/select_drivers.py
     Procedure:
@@ -101,10 +106,10 @@ def forward_selection(peartot,attr_x_genotype,plot_selection,model_preds,outdir,
         if ((forward_contribution - old_forward_contribution) > 0.05) and (snp_pearson > 0) and (snp_pearson_p < 0.01/len(attr_x_genotype.index)):
             drivers.append(variant)
             if plot_selection == 'drivers':
-                plot_driver_selection(sum_attr_x_genotype, snp_attr_x_genotype,forward_sum_attr_x_genotype, model_preds,  peartot, snp_pearson,pearson_forward, outdir,variant)
+                plot_driver_selection(sum_attr_x_genotype, snp_attr_x_genotype,forward_sum_attr_x_genotype, model_preds,  peartot, snp_pearson,pearson_forward, model_outdir,variant,filename)
 
         if plot_selection == 'all':
-            plot_driver_selection(sum_attr_x_genotype, snp_attr_x_genotype,forward_sum_attr_x_genotype, model_preds,  peartot, snp_pearson,pearson_forward, outdir,i)
+            plot_driver_selection(sum_attr_x_genotype, snp_attr_x_genotype,forward_sum_attr_x_genotype, model_preds,  peartot, snp_pearson,pearson_forward, model_outdir,i,filename)
         
         forward_selection_dict['forward_contribution'].append(forward_contribution)
         forward_selection_dict['old_forward_contribution'].append(old_forward_contribution)
@@ -119,7 +124,7 @@ def forward_selection(peartot,attr_x_genotype,plot_selection,model_preds,outdir,
     df['LinearApproximationCorrelation'] = peartot
     return df
    
-def forward_selection_with_only_drivers(peartot,attr_x_genotype,plot_selection,model_preds,outdir,sum_attr_x_genotype):
+def forward_selection_with_only_drivers(peartot,attr_x_genotype,plot_selection,model_preds,model_outdir,sum_attr_x_genotype,filename):
     """
     Adapted from https://github.com/mostafavilabuw/EnformerAssessment/blob/main/enformer_analysis/select_drivers.py
     Same as `forward_selection` except instead of each SNP being iteratively added to the sum, they are only added to the sum if they are a driver
@@ -141,7 +146,7 @@ def forward_selection_with_only_drivers(peartot,attr_x_genotype,plot_selection,m
         snp_pearson, snp_pearson_p = pearsonr(snp_attr_x_genotype,model_preds['y_pred'],alternative = 'greater')
 
         if plot_selection == 'all':
-            plot_driver_selection(sum_attr_x_genotype, snp_attr_x_genotype,forward_sum_attr_x_genotype, model_preds,  peartot, snp_pearson,pearson_forward, outdir,i)
+            plot_driver_selection(sum_attr_x_genotype, snp_attr_x_genotype,forward_sum_attr_x_genotype, model_preds,  peartot, snp_pearson,pearson_forward, model_outdir,i,filename)
         
         forward_selection_dict['forward_contribution'].append(forward_contribution)
         forward_selection_dict['old_forward_contribution'].append(old_forward_contribution)
@@ -153,7 +158,7 @@ def forward_selection_with_only_drivers(peartot,attr_x_genotype,plot_selection,m
         if ((forward_contribution - old_forward_contribution) > 0.05) and (snp_pearson > 0) and (snp_pearson_p < 0.01/len(attr_x_genotype.index)):
             drivers.append(variant)
             if plot_selection == 'drivers':
-                plot_driver_selection(sum_attr_x_genotype, snp_attr_x_genotype,forward_sum_attr_x_genotype, model_preds,  peartot, snp_pearson,pearson_forward, outdir,variant)
+                plot_driver_selection(sum_attr_x_genotype, snp_attr_x_genotype,forward_sum_attr_x_genotype, model_preds,  peartot, snp_pearson,pearson_forward, model_outdir,variant,filename)
 
             old_forward_contribution = forward_contribution
     df = pd.DataFrame(forward_selection_dict)
@@ -161,8 +166,8 @@ def forward_selection_with_only_drivers(peartot,attr_x_genotype,plot_selection,m
     df['LinearApproximationCorrelation'] = peartot
     return df
 
-def eval_driver_performance(gene_outdir,driver_filename, attr_x_genotype,model_preds):
-    driver_results = pd.read_csv(os.path.join(gene_outdir,driver_filename))
+def eval_driver_performance(model_outdir,driver_filename, attr_x_genotype,model_preds):
+    driver_results = pd.read_csv(os.path.join(model_outdir,driver_filename))
     drivers = driver_results[driver_results['is_driver'] == True]['variant']
 
     forward_sum_attr_x_genotype = np.sum(attr_x_genotype.loc[drivers, :],axis = 0).reindex(model_preds.index) #then reindex to make sure order of donors and their linear approx is same as in model_preds
@@ -173,15 +178,10 @@ def eval_driver_performance(gene_outdir,driver_filename, attr_x_genotype,model_p
         'pearson_driver_observed' : [pearson_driver_observed],
         'r2_driver_observed' : [r2_driver_observed]
      }
-    pd.DataFrame(metrics_dict).to_csv(os.path.join(gene_outdir,"DriverPerformance.csv"))
-    model_preds.join(forward_sum_attr_x_genotype.rename('driver_sum')).to_csv(os.path.join(gene_outdir,"DriverPredictions.csv"))
+    pd.DataFrame(metrics_dict).to_csv(os.path.join(model_outdir,"DriverPerformance.csv"))
+    model_preds.join(forward_sum_attr_x_genotype.rename('driver_sum')).to_csv(os.path.join(model_outdir,"DriverPredictions.csv"))
     
-def select_and_evaluate_drivers(ism_results,desired_seq_len,gene_name,donors, model_preds, plot_selection,outdir, driver_method, name,select_drivers,evaluate_drivers):
-    gene_outdir = os.path.join(outdir,driver_method,f"{gene_name}_{name}")
-    filename = f'{gene_name}_{name}_{driver_method}_ISMDrivers.csv'
-    if not os.path.isdir(gene_outdir):
-        os.makedirs(gene_outdir)
-
+def select_and_evaluate_drivers(ism_results,desired_seq_len,gene_name,donors, model_preds, plot_selection,model_outdir, driver_method,filename,select_drivers,evaluate_drivers):
     gt_map = {
         '0/0': 0 ,
         '0/1': 1, 
@@ -214,13 +214,26 @@ def select_and_evaluate_drivers(ism_results,desired_seq_len,gene_name,donors, mo
         peartot = pearsonr(sum_attr_x_genotype,model_preds['y_pred'])[0] #how close the linear approximation is to the full model predictions
 
         if driver_method == 'forward_selection':
-            df = forward_selection(peartot,attr_x_genotype,plot_selection,model_preds,gene_outdir,sum_attr_x_genotype)
+            df = forward_selection(peartot,attr_x_genotype,plot_selection,model_preds,model_outdir,sum_attr_x_genotype,filename)
         else:
-            df = forward_selection_with_only_drivers(peartot,attr_x_genotype,plot_selection,model_preds,gene_outdir,sum_attr_x_genotype)
-        df.to_csv(os.path.join(gene_outdir,filename))
+            df = forward_selection_with_only_drivers(peartot,attr_x_genotype,plot_selection,model_preds,model_outdir,sum_attr_x_genotype,filename)
+        df.to_csv(os.path.join(model_outdir,filename))
     if evaluate_drivers == 'true':
-        assert os.path.exists(os.path.join(gene_outdir,filename)), "Driver selection must precede driver evaluate"
-        eval_driver_performance(gene_outdir,filename, attr_x_genotype,model_preds)
+        assert os.path.exists(os.path.join(model_outdir,filename)), "Driver selection must precede driver evaluate"
+        eval_driver_performance(model_outdir,filename, attr_x_genotype,model_preds)
+
+
+def get_filenames_to_skip(skip_finished_runs, model_outdir):
+    """
+    return a list of filenames corresponding to finished experiments from this model if skip_finished_runs == 'true'. this list is empty if 'false'. The filename that will otherwise be made is checked against this list. 
+    If it is not in this list, it will be made. So if the list is empty they will always be made.
+    """
+    if skip_finished_runs == 'true':
+        finished_runs = os.listdir(model_outdir)
+    else:
+        finished_runs = []
+    return finished_runs
+
 
 def main():
     parser = argparse.ArgumentParser(description="Select Drivers from ISM attributions")
@@ -231,6 +244,10 @@ def main():
     parser.add_argument("--select_drivers",type=str)
     parser.add_argument("--evaluate_drivers",type=str)
     parser.add_argument("--skip_finished_runs",type=str)
+    parser.add_argument("--outdir",nargs = '?',type=str)
+    parser.add_argument("--ism_dir",nargs = '?',type=str,help = 'path to ISM results for observed SNPs around genes these models were trained/tested on')
+    parser.add_argument("--subset",type=int,nargs = '?',help = "Metadata enumerating models will be split into n_subsets and this subset of models will be evaluated by the job.")
+    parser.add_argument("--n_subsets",type=int,nargs = '?',help = "Metadata enumerating models will be split into n_subsets.")
 
 
 
@@ -238,27 +255,36 @@ def main():
     metadata = pd.read_csv(args.path_to_metadata)
     metadata = metadata.rename(columns = {'ID':'run_id'})
     model_type = args.model_type
-    assert model_type in ['SingleGene','MultiGene']
+    assert model_type in ['SingleGene','MultiGene','OligoGene']
     driver_method = args.driver_method
     plot_selection = args.plot_selection.lower()
     select_drivers = args.select_drivers.lower()
     evaluate_drivers = args.evaluate_drivers.lower()
     skip_finished_runs = args.skip_finished_runs.lower()
+    outdir = args.outdir
+    ism_dir = args.ism_dir
+    subset = args.subset
+    n_subsets = args.n_subsets
     assert str(plot_selection) in ['false','all','drivers']
     assert driver_method in ['forward_selection','forward_selection_with_only_drivers']
     assert select_drivers in ['false','true']
     assert evaluate_drivers in ['false','true']
     cwd = os.getcwd()
     data_dir = os.path.join(cwd,'../data')
-    ism_dir = os.path.join(cwd,f'../results/PerformerISM')
-    outdir = os.path.join(cwd,f'../results/PerformerDriverSelection/{model_type}')
+    if not ism_dir: 
+        ism_dir = os.path.join(cwd,f'../results/PerformerISM')
+    if not outdir:
+        outdir = os.path.join(cwd,f'../results/PerformerDriverSelection/{model_type}')
     
 
-    #will skip all runs where a directory for drivers has been made (even if the results haven't been generated)
-    if skip_finished_runs == 'true':
-        finished_runs = os.listdir(os.path.join(outdir,driver_method))
-    else:
-        finished_runs = []
+    
+
+    if n_subsets:
+        n_subsets = int(n_subsets) #ensure read as int
+        subset = int(subset)
+        metadata = np.array_split(metadata,int(n_subsets))[int(subset)]
+
+    
 
 
     for idx, row in metadata.iterrows():
@@ -283,7 +309,12 @@ def main():
             else:
                 raise Exception(f"Tissue {tissues_to_train} is not supported!")
             gene_name = ism_result_file.split('_')[0]
-            if f"{gene_name}_{name}" not in finished_runs:
+            model_outdir = os.path.join(outdir,driver_method,name)
+            filename = f'{gene_name}_{name}_{driver_method}_ISMDrivers.csv'
+            if not os.path.isdir(model_outdir):
+                os.makedirs(model_outdir)
+            finished_runs = get_filenames_to_skip(skip_finished_runs,model_outdir)
+            if filename not in finished_runs:
                 print(f"On ism result {idx2} of {len(model_results_dir)} of Model {idx}/ {metadata.shape[0]} Using Method {driver_method}")
                 ism_results = pd.read_csv(os.path.join(ism_result_dir,model_type,run_id,ism_result_file))
                 ism_results['attr'] = ism_results['alt_pred'] - ism_results['ref_pred']
@@ -292,8 +323,13 @@ def main():
                 model_preds = model_preds[model_preds['gene'] == gene_name]
                 donors = list(model_preds['donor'].unique())
                 model_preds = model_preds.set_index('donor') #set donor as index to allow for easy re-indexing of pd.Series objects later 
-                select_and_evaluate_drivers(ism_results,desired_seq_len,gene_name,donors, model_preds, plot_selection,outdir, driver_method,name,select_drivers,evaluate_drivers)
-           
+                try:
+                    select_and_evaluate_drivers(ism_results,desired_seq_len,gene_name,donors, model_preds, plot_selection,model_outdir, driver_method,filename,select_drivers,evaluate_drivers)
+                except Exception as e:
+                    print(e)
+            else:
+                print(f"Skipping {filename}")
+            sys.stdout.flush()
 
 if __name__ == '__main__':
     main()

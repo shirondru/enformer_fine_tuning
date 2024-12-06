@@ -26,7 +26,7 @@ echo $(pwd)
 
 test_gene=WDR25
 base_dir=/pollard/data/projects/sdrusinsky/enformer_fine_tuning/data/genes/Whole_Blood/train_oligo_eval_test_gene/$test_gene
-config_path=/pollard/data/projects/sdrusinsky/enformer_fine_tuning/code/configs/blood_config.yaml
+config_path=/pollard/data/projects/sdrusinsky/enformer_fine_tuning/performer/configs/blood_config.yaml
 script_path=./train_oligogene.py
 for fold in 0 1 2; do
     for seed in 0 1 2; do

@@ -1,7 +1,7 @@
 import os
 import sys
 import numpy as np
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../code')))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../performer')))
 from train_gtex import *
 from eval_enformer_gtex import slice_enformer_pred
 from ism_performer import tss_centered_sequences, get_window_around_TSS,load_model, one_hot_encode, IsmDataset,LitModelPerformerISM
@@ -9,7 +9,7 @@ from enformer_pytorch import Enformer
 
 torch.use_deterministic_algorithms(True)
 def test_train_dataloader():
-    config_path = "../code/configs/blood_config.yaml"
+    config_path = "../performer/configs/blood_config.yaml"
     model_type = 'SingleGene'
     DATA_DIR = "../data"
     fold = 0
@@ -316,7 +316,7 @@ def test_enformer_ism():
 
         ref_pred = ref_pred[enformer_output_dim].item()
         alt_pred = alt_pred[enformer_output_dim].item()
-    experimental_results = pd.read_csv(os.path.join(cwd,'../code/results/EnformerISM/BTNL3_Enformer_model_ISM_49152bp_Brain - Cortex,Whole Blood_3CenterBins.csv'))
+    experimental_results = pd.read_csv(os.path.join(cwd,'../performer/results/EnformerISM/BTNL3_Enformer_model_ISM_49152bp_Brain - Cortex,Whole Blood_3CenterBins.csv'))
     variant_results = experimental_results[experimental_results['pos0'] == metadata['metadata']['pos']]
     variant_results = variant_results[variant_results['enformer_output_dim'] == enformer_output_dim]
     ref_results = variant_results['ref_pred'].item()
@@ -330,7 +330,7 @@ def test_checkpoint_during_training():
     """
     cwd = os.getcwd()
     DATA_DIR = os.path.join(cwd,'../data')
-    config_path="/pollard/data/projects/sdrusinsky/enformer_fine_tuning/code/configs/blood_config.yaml"
+    config_path="/pollard/data/projects/sdrusinsky/enformer_fine_tuning/performer/configs/blood_config.yaml"
     model_type='SingleGene'
     fold=0
 

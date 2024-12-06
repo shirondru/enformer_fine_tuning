@@ -22,7 +22,7 @@ cd ..
 echo $SCRIPT_PATH
 echo $(pwd)
 
-path_to_metadata=/pollard/data/projects/sdrusinsky/enformer_fine_tuning/code/metadata_from_past_runs/wandb_export_FinalPaperWholeBlood_SingleGene.csv
+path_to_metadata=/pollard/data/projects/sdrusinsky/enformer_fine_tuning/performer/metadata_from_past_runs/wandb_export_FinalPaperWholeBlood_SingleGene.csv
 script_path=./ism_performer.py
 model_type=SingleGene
 

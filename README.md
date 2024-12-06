@@ -12,8 +12,8 @@ NOTE: Not all necessary data is provided in this repository. This is because som
 eval “$(/PATH/TO/MINIFORGE3/bin/conda shell.bash hook)" #specify path to miniforge3 conda executable
 conda env create -f environment.yml #install requirements
 ```
-4. (Optional) update SLURM job scripts under `code/submission_scripts` to accommodate your requirements and directory locations. For example, the stderr/stdout locations must be changed to match your file structure, as does the activation of the conda environment. If you are not using a SLURM job scheduler, update the job scripts accordingly.
-5. (Optional) Follow the [Weights & Biases quickstart](https://docs.wandb.ai/quickstart). W&B is used to track training experiments and metadata from past runs is parsed in subsequent experiments. For example, when performing in silico mutagenesis, information like sequence length, training tissue, and training genes is used. Examples of these metadata files can be found under `code/metadata_from_past_runs`. If you prefer not to use W&B, then (1) all `wandb` calls in python scripts must be removed, (2) `config` files must be restructured within python training scripts, and (3) metadata files should be generated to maintain compatibility.
+4. (Optional) update SLURM job scripts under `performer/submission_scripts` to accommodate your requirements and directory locations. For example, the stderr/stdout locations must be changed to match your file structure, as does the activation of the conda environment. If you are not using a SLURM job scheduler, update the job scripts accordingly.
+5. (Optional) Follow the [Weights & Biases quickstart](https://docs.wandb.ai/quickstart). W&B is used to track training experiments and metadata from past runs is parsed in subsequent experiments. For example, when performing in silico mutagenesis, information like sequence length, training tissue, and training genes is used. Examples of these metadata files can be found under `performer/metadata_from_past_runs`. If you prefer not to use W&B, then (1) all `wandb` calls in python scripts must be removed, (2) `config` files must be restructured within python training scripts, and (3) metadata files should be generated to maintain compatibility.
 6. Pre-process GTEx VCF files and generate consensus sequences from each individual's variant calls. You must [apply](https://gtexportal.org/home/protectedDataAccess) for access before doing this. Code is provided to help do this, using an SGE scheduler:
    
 A) Download hg38 reference genome fasta file. Install [samtools](http://www.htslib.org/) if necessary.
@@ -26,7 +26,7 @@ B) First pre-process the VCF files, converting them to bcf files and retrieving 
 DATA_DIR="$(realpath ./data)"
 vcf_path=$DATA_DIR/VCF
 
-sh code/process_vcf/prep_VCF_for_fasta_consensus_run_job.sh $vcf_path
+sh performer/process_vcf/prep_VCF_for_fasta_consensus_run_job.sh $vcf_path
 ```
 C) Take processed BCF file and generate two consensus sequences for each individual with WGS & RNA-seq data -- one per haplotype.
 ```
@@ -48,9 +48,9 @@ mv GTEx_Analysis_v8_eQTL_expression_matrices/Whole_Blood.v8.normalized_expressio
 # Example Usage
 To train single-gene and multi-gene Performer models on Whole Blood GTEx data using ~300 genes, run:
 ```
-sh .code/submission_scripts/submit_gtex.sh
+sh .performer/submission_scripts/submit_gtex.sh
 ```
-This will launch 6 SLURM jobs (3 single-gene & 3 multi-gene; training 3 replicates per model using different train/validation/test folds). Each job will be launched via `code/submission_scripts/slurm_train_gtex.sh`. Please update `slurm_train_gtex.sh` to match your requirements (see requirement #4 above). `slurm_train_gtex.sh` will launch `train_gtex.py` using configurations (e.g., learning rate, training tissue) from `code/configs/blood_config.yaml`. `train_gtex.py` will select the ~300 genes used in the paper and fine-tune Enformer’s pre-trained weights using paired WGS & RNA-seq.
+This will launch 6 SLURM jobs (3 single-gene & 3 multi-gene; training 3 replicates per model using different train/validation/test folds). Each job will be launched via `performer/submission_scripts/slurm_train_gtex.sh`. Please update `slurm_train_gtex.sh` to match your requirements (see requirement #4 above). `slurm_train_gtex.sh` will launch `train_gtex.py` using configurations (e.g., learning rate, training tissue) from `performer/configs/blood_config.yaml`. `train_gtex.py` will select the ~300 genes used in the paper and fine-tune Enformer’s pre-trained weights using paired WGS & RNA-seq.
 
 To modify training hyperparameters, update or create a new config file. Config files are read within the training script (e.g., `train_gtex.py`) and different config parameters can be added within the script. ./performer/configs/blood_config.yaml is shown below, see comments for more details on how things can be changed.
 ```

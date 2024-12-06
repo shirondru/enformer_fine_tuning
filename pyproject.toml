@@ -1,0 +1,30 @@
+[tool.poetry]
+name = "performer"
+version = "1.0.0"
+license = "MIT"
+readme = "README.md"
+description = "For fine-tuning Enformer using paired WGS & gene expression data"
+
+packages = [
+	{ include = "code" },
+	{ include = "pyproject.toml" }
+]
+
+[tool.poetry.urls]
+Source = "https://github.com/shirondru/enformer_fine_tuning"
+
+[tool.poetry.dependencies]
+python = "^3.12 <4.0"
+enformer_pytorch = "*"
+kipoiseq = "*"
+pysam = "*"
+wandb = "*"
+vcfpy = "*"
+
+[tool.poetry.group.test.dependencies]
+pytest = "*"
+tomli = "*"
+
+[build-system]
+requires = ["poetry-core>=1.0.0", "poetry-dynamic-versioning>=1.0.0,<2.0.0"]
+build-backend = "poetry_dynamic_versioning.backend"

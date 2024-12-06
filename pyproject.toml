@@ -14,7 +14,7 @@ authors = [
 packages = [
 	{ include = "code" },
 	{ include = "data" },
-	{ include = "tests" }
+	{ include = "tests" },
 	{ include = "pyproject.toml" }
 ]
 

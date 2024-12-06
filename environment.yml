@@ -351,4 +351,3 @@ dependencies:
       - vcfpy==0.13.8
       - vector-quantize-pytorch==1.14.31
       - wandb==0.17.3
-prefix: /pollard/home/sdrusinsky/miniforge3/envs/test_pt231

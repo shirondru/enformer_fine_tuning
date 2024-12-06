@@ -91,5 +91,16 @@ patience: 20
 valid_metrics_save_freq: 1
 ```
 
+## Install as a package
+To install this repo as a package, run:
+```
+pip install git+https://github.com/shirondru/enformer_fine_tuning
+```
+
+Then, you can import the package named `performer` and use the functions within.
+```
+import performer
+```
+
 ## TODO:
 convert GTEx_Analysis_2017-06-05_v8_RNASeQCv1.1.9_gene_tpm.gct.gz -> GTEx_gene_tpm.csv

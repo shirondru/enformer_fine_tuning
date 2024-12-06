@@ -7,6 +7,7 @@ import argparse
 import kipoiseq
 import pandas as pd
 import numpy as np
+import sys
 import lightning.pytorch as pl
 from torch.utils.data import IterableDataset, DataLoader
 from pl_models import LitModelHeadAdapterWrapper
@@ -269,6 +270,9 @@ def main():
                     deterministic = True)  
                 trainer.predict(lit_model,dataloader) #perform ISM
                 lit_model.results_df.to_csv(filename)
+            else:
+                print(f"Skipping {os.path.join(outpath,f"{gene}_{run_id}_model_ISM_{window * 2}bp.csv")}")
+            sys.stdout.flush()
         del model
         gc.collect()
         torch.cuda.empty_cache()

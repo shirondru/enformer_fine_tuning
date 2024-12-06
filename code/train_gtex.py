@@ -44,6 +44,12 @@ def prepare_genes(config):
         elif model_type == 'SingleGene':
             valid_genes = []
             test_genes = []
+
+    #no matter what, if these are defined in config, use them.
+    if 'valid_gene_path' in config:
+        valid_genes = parse_gene_files(config['valid_gene_path'])
+    if 'test_gene_path' in config:
+        test_genes = parse_gene_files(config['test_gene_path']) 
     return train_gene_filedir, train_gene_filenames, valid_genes, test_genes
 
 def ensure_no_gene_overlap(train_genes,val_genes,test_genes,eval_test_gene_during_validation = False):
@@ -207,13 +213,14 @@ def main():
     parser.add_argument("--config_path",type=str)
     parser.add_argument("--fold",type=int)
     parser.add_argument("--model_type",type=str)
+    parser.add_argument("--seed", type = int, nargs='?')
 
     args = parser.parse_args()
     config_path = args.config_path
     fold = int(args.fold)
+    seed = args.seed
     model_type = args.model_type
     assert model_type in ['SingleGene','MultiGene']
-    
 
     current_dir = os.path.dirname(__file__)
     DATA_DIR = os.path.join(current_dir,'../data')
@@ -223,6 +230,12 @@ def main():
         config = yaml.safe_load(file)
     config['model_type'] = model_type
     config['DATA_DIR'] = DATA_DIR
+    if type(seed) == int:
+        seed = int(seed) #ensure read as int if defined
+        config['seed'] = seed
+    else:
+        assert 'seed' in config
+        seed = int(config['seed'])
 
     
     train_gene_filedir, train_gene_filenames, valid_genes, test_genes = prepare_genes(config)
@@ -231,7 +244,7 @@ def main():
         wandb_filename = f"{config['model_type']}_{train_gene_filename.strip('.txt')}"
         train_gene_path = os.path.join(os.path.join(train_gene_filedir,train_gene_filename))
         train_genes = parse_gene_files(train_gene_path) #will contain 1 gene if this is a single gene model, else it will contain ~300 genes
-        wandb_exp_name = config['experiment_name'] + f'_Fold-{fold}_' + wandb_filename
+        wandb_exp_name = config['experiment_name'] + f'_Fold-{fold}_Seed-{seed}' + wandb_filename
         wandb.init(
             project = 'fine_tune_enformer',
             name = wandb_exp_name,
@@ -242,7 +255,7 @@ def main():
         wandb.config.update({'train_genes':train_genes})
         wandb.config.update({'valid_genes':valid_genes})
         wandb.config.update({'test_genes':test_genes})
-        wandb.config.update({'save_dir' : os.path.join(current_dir,f"../results/{config['experiment_name']}/{model_type}/{train_gene_filename.strip('.txt')}/Fold-{fold}/{wandb.run.id}")})
+        wandb.config.update({'save_dir' : os.path.join(current_dir,f"../results/{config['experiment_name']}/{model_type}/{train_gene_filename.strip('.txt')}/Fold-{fold}/Seed-{seed}/{wandb.run.id}")})
         pl.seed_everything(int(wandb.config.seed), workers=True)
         torch.use_deterministic_algorithms(True)
         train_gtex(wandb.config,train_genes,valid_genes,test_genes)

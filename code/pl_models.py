@@ -6,6 +6,7 @@ import lightning.pytorch as pl
 from enformer_pytorch.finetune import HeadAdapterWrapper
 from enformer_pytorch import Enformer
 from torchmetrics.regression import PearsonCorrCoef,R2Score
+from warnings import warn
 
 def masked_mse(y_hat,y):
     """
@@ -78,7 +79,8 @@ class LitModel(pl.LightningModule):
         if not eval_test_gene_during_validation:
             assert len(list(valid_test_overlap)) == 0, f"There is overlap between genes in the valid and test set via the following genes {valid_test_overlap}"
 
-        assert len(self.genes_for_training) > 0, "You have no genes to train on!"
+        if len(self.genes_for_training)  == 0:
+            warn("You have no genes to train on!")
 
         assert len([x for x in self.train_dataset.genes_in_dataset if x not in self.genes_for_training]) == 0, "There are genes in the train set besides those desired for training!"
 
@@ -156,6 +158,29 @@ class LitModelHeadAdapterWrapper(LitModel):
 
         self.model = HeadAdapterWrapper(
             enformer = enformer,
+            num_tracks = len(self.tissues_to_train),
+            post_transformer_embed = False, # important to keep False
+            output_activation = nn.Identity()
+        )
+
+    def forward(self, x):
+        return self.model(x, freeze_enformer = False)
+
+class LitModelHeadAdapterWrapperRandom(LitModel):
+    """Same as LitModelHeadAdapterWrapper but Enformer is loaded using random weights not pre-trained weights"""
+    def __init__(self, tissues_to_train,save_dir,train_dataset,learning_rate,alpha,genes_for_training,genes_for_valid,genes_for_test,eval_test_gene_during_validation = False):
+        super().__init__(tissues_to_train,save_dir,train_dataset,learning_rate,alpha,genes_for_training,genes_for_valid,genes_for_test,eval_test_gene_during_validation)
+
+        random_enformer = Enformer.from_hparams(
+                dim = 1536,
+                depth = 11,
+                heads = 8,
+                output_heads = dict(human = 5313, mouse = 1643),
+                target_length = -1
+            )
+
+        self.model = HeadAdapterWrapper(
+            enformer = random_enformer,
             num_tracks = len(self.tissues_to_train),
             post_transformer_embed = False, # important to keep False
             output_activation = nn.Identity()

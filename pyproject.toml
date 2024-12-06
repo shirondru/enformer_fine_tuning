@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "performer"
+name = "enformer_fine_tuning"
 version = "1.0.0"
 license = "MIT"
 readme = "README.md"
@@ -13,6 +13,8 @@ authors = [
 
 packages = [
 	{ include = "code" },
+	{ include = "data" },
+	{ include = "tests" }
 	{ include = "pyproject.toml" }
 ]
 

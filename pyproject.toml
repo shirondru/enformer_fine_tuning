@@ -5,6 +5,12 @@ license = "MIT"
 readme = "README.md"
 description = "For fine-tuning Enformer using paired WGS & gene expression data"
 
+authors = [
+	"Shiron Drusinsky",
+	"Sean Whalen",
+	"Katherine S. Pollard"
+]
+
 packages = [
 	{ include = "code" },
 	{ include = "pyproject.toml" }

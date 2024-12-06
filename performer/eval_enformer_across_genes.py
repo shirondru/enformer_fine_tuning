@@ -5,8 +5,8 @@ import argparse
 import torch
 import lightning.pytorch as pl
 from torch.utils.data import DataLoader
-from datasets import EvalAcrossGeneDataset
-from eval_enformer_gtex import *
+from .datasets import EvalAcrossGeneDataset
+from .eval_enformer_gtex import *
 
 def main():
     parser = argparse.ArgumentParser(description="For For evaluation of enformer's ability to predict average expression of unseen genes")

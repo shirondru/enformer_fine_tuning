@@ -1,4 +1,4 @@
-from train_gtex_all_genes import *
+from .train_gtex_all_genes import *
 class AttrDict(dict):
     """A dictionary class that supports attribute-style access."""
     def __getattr__(self, item):

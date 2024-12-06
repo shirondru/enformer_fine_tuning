@@ -1,7 +1,7 @@
 """
 For evaluating trained models on genes that weren't included for train/val/test during train time
 """
-from train_gtex import *
+from .train_gtex import *
 
 def load_test_gtex_datasets(row,test_genes,donor_pickiness,DATA_DIR):
     assert donor_pickiness in ['all_donors','only_test_donors']

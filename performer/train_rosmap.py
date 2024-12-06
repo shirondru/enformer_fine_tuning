@@ -1,6 +1,6 @@
-from train_gtex import parse_gene_files,prepare_genes,ensure_no_donor_overlap, define_donor_paths, load_callbacks, load_trainer, ensure_no_gene_overlap
-from pl_models import *
-from datasets import *
+from .train_gtex import parse_gene_files,prepare_genes,ensure_no_donor_overlap, define_donor_paths, load_callbacks, load_trainer, ensure_no_gene_overlap
+from .pl_models import *
+from .datasets import *
 import argparse
 import yaml
 import wandb
@@ -8,6 +8,8 @@ import lightning.pytorch as pl
 from torch.utils.data import DataLoader
 import warnings
 warnings.filterwarnings('ignore', '.*does not have many workers.*')
+
+
 def load_rosmap_datasets(config,train_genes,valid_genes,test_genes):    
     tissues_to_train = config.tissues_to_train.split(',') #ex: 'Whole Blood' -> ['Whole Blood]
     assert len(tissues_to_train) == 1, "Multi-tissue training not yet supported"

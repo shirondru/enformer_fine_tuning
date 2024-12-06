@@ -1,4 +1,5 @@
-from train_gtex import *
+from .train_gtex import *
+
 def main():
     parser = argparse.ArgumentParser(description="Run a training experiment")
     parser.add_argument("--config_path",type=str)

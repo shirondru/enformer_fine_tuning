@@ -1,4 +1,4 @@
-from train_gtex import *
+from .train_gtex import *
 
 """
 Train with a subset of genes while using downsampled train donors 

@@ -1,6 +1,6 @@
 import argparse
-from pl_models import *
-from datasets import *
+from .pl_models import *
+from .datasets import *
 import yaml
 import wandb
 import lightning.pytorch as pl

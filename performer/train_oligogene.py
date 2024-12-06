@@ -1,4 +1,4 @@
-from train_gtex import *
+from .train_gtex import *
 
 
 def main():

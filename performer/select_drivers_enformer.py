@@ -5,9 +5,9 @@ import matplotlib.pyplot as plt
 import os
 import pandas as pd
 import sys
-from ism_performer import *
 import argparse
-from select_drivers_performer import *
+from .ism_performer import *
+from .select_drivers_performer import *
 
 def get_enformer_eval(tissue,donor_fold,desired_seq_len,n_center_bins):
     cwd = os.getcwd()

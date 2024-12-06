@@ -1,5 +1,5 @@
-from train_rosmap import *
-from eval_enformer_gtex import *
+from .train_rosmap import *
+from .eval_enformer_gtex import *
 torch.use_deterministic_algorithms(True)
 """
 For evaluating Enformer on matched WGS & RNA-seq data where the individuals from the "test set" -- those that were used to test our Performer models, 

@@ -1,5 +1,5 @@
-from train_gtex import *
-from datasets import CustomDataModule, CustomDistributedSampler
+from .train_gtex import *
+from .datasets import CustomDataModule, CustomDistributedSampler
 
 def load_trainer_multi_gpu(config):
     metric_logger,early_stopper,checkpoint_callback = load_callbacks(config)

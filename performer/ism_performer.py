@@ -10,7 +10,7 @@ import numpy as np
 import sys
 import lightning.pytorch as pl
 from torch.utils.data import IterableDataset, DataLoader
-from pl_models import LitModelHeadAdapterWrapper
+from .pl_models import LitModelHeadAdapterWrapper
 
 
 torch.use_deterministic_algorithms(True)

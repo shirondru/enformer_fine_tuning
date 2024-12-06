@@ -1,5 +1,5 @@
-from eval_enformer_gtex import *
-from ism_performer import get_all_gtex_snps, tss_centered_sequences
+from .eval_enformer_gtex import *
+from .ism_performer import get_all_gtex_snps, tss_centered_sequences
 torch.use_deterministic_algorithms(True)
 
 def parse_tissues_to_train(tissues_to_train):

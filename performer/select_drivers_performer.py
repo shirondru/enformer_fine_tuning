@@ -6,8 +6,8 @@ from sklearn.metrics import r2_score
 import matplotlib.pyplot as plt
 import pandas as pd
 import sys
-from ism_performer import *
 import argparse
+from .ism_performer import *
 
 #import warning that will happen if model predicts same value for every person (when model is really bad at a gene)
 #or if nobody (or everybody) has a particular snp during driver analysis

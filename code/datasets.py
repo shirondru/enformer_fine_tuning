@@ -475,10 +475,6 @@ class GTExRefDataset(GTExDataset):
         gene_name (str): Gene to get expression from.
 
         """
-        # assert type(gene_name) == str
-        # vals = self.gene_expression_df.sel(gene_name = gene_name,donor_id = self.individuals_in_split, tissue = self.tissues_to_train) #pass in all individuals
-        # mean_vals = vals.mean(dim = 'donor_id').values
-        # return mean_vals
         gene_expression_vector = np.zeros((len(self.tissues_to_train)), dtype=np.float32)
         #self.individuals_in_split are all people with data in this tissue and for which we have WGS
         gene_df = self.gene_expression_df[self.gene_expression_df['Description'].isin(gene_name)]
@@ -488,7 +484,7 @@ class GTExRefDataset(GTExDataset):
         gene_df = gene_df[self.individuals_in_split]
         assert len(gene_df.columns) == len(self.individuals_in_split)
         
-        gene_expression_vector[0] = np.mean(gene_df,axis = 1)
+        gene_expression_vector[0] = np.mean(gene_df,axis = 1) #average over donors for this gene in this tissue
         breakpoint()
         return gene_expression_vector
     def __getitem__(self, idx):

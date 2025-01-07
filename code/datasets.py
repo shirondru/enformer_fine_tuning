@@ -439,6 +439,77 @@ class CustomDataModule(LightningDataModule):
         return DataLoader(self.test_dataset, batch_size= 1, shuffle=False,num_workers = 8, sampler = CustomDistributedSampler(self.test_dataset,shuffle=False)),
     
 
+class GTExRefDataset(GTExDataset):
+    def __init__(self, 
+             tissues_to_train: list, 
+             requested_regions: list, 
+             desired_seq_len: int, 
+             donor_list_path: str, 
+             gene_expression_df,
+             DATA_DIR: str) -> None:
+        """
+         Args:
+            tissues_to_train (list): List of GTEx tissues to be trained.
+            requested_regions (list): List of desired genes.
+            desired_seq_len (int): Desired length of input DNA sequences. These sequences will be TSS-centered, and this controls how big of a region around the gene's TSS will be used.
+            donor_list_path (str): Path to a line-separated txt file denoting the GTEx donor IDs whose expression values will be averaged over (provided they have data in a given tissue)
+            DATA_DIR (str): Directory for data storage.
+            rc_prob (float): Probability any given sequence in a batch will be reverse complemented. Because the sequences are TSS centered, the targets are not reversed 
+         """
+         
+        super().__init__(tissues_to_train,requested_regions, desired_seq_len,1,donor_list_path,gene_expression_df,DATA_DIR)
+    def shuffle_and_define_epoch(self):
+        self.genomic_regions_df = self.genomic_regions_df.sample(frac=1).reset_index(drop=True) #shuffle dataset. Keep this here so the dataset shuffling within litmodel.on_train_epoch_end persists
+        
+        self.region_rows_in_epoch = [] 
+        for i in range(0, len(self.genomic_regions_df), 1):
+            self.region_rows_in_epoch.append(self.genomic_regions_df.iloc[i])
+    def get_path_to_consensus_seq(self,donor_id, haplotype_num):
+        """
+        Overwrite this with path to reference genome instead of path to personal genomes, so every batch will always contain reference genomes
+        """
+        return os.path.join(self.DATA_DIR, "hg38_genome.fa")
+    def _get_single_GTEx_donor_expression(self,gtex_id,gene_name):
+        """
+        gtex_id (str): GTEx donor ID
+        gene_name (str): Gene to get expression from.
+
+        """
+        # assert type(gene_name) == str
+        # vals = self.gene_expression_df.sel(gene_name = gene_name,donor_id = self.individuals_in_split, tissue = self.tissues_to_train) #pass in all individuals
+        # mean_vals = vals.mean(dim = 'donor_id').values
+        # return mean_vals
+        gene_expression_vector = np.zeros((len(self.tissues_to_train)), dtype=np.float32)
+        #self.individuals_in_split are all people with data in this tissue and for which we have WGS
+        gene_df = self.gene_expression_df[self.gene_expression_df['Description'].isin(gene_name)]
+        assert gene_df.shape[0] > 0, f"There is no gene expression data available for gene(s) at position {gene_name}"
+
+        #get all expression columns corresponding to donors with data in the desired tissue
+        gene_df = gene_df[self.individuals_in_split]
+        assert len(gene_df.columns) == len(self.individuals_in_split)
+        
+        gene_expression_vector[0] = np.mean(gene_df,axis = 1)
+        breakpoint()
+        return gene_expression_vector
+    def __getitem__(self, idx):
+        individual = 'RefGenomeAverageExpression' #use arbitrary string as a placeholder. Ref genome & Average expression will be used so this is irrelevant              
+                       
+        region_row = self.region_rows_in_epoch[idx]
+        dna_vector, expression_vector = self.generate_train_batch_one_gene(
+                                                                            individual,
+                                                                            region_row['seqnames'],
+                                                                            region_row['starts'],
+                                                                            region_row['ends'],
+                                                                            region_row['gene_name']
+                                                                            )
+        breakpoint()
+        return dna_vector, expression_vector, region_row['gene_name'],individual,idx
+
+    def __len__(self):
+        """
+        Overwrite to equal the number of genes
+        """
+        return len(self.genomic_regions_df)
 if __name__ == "__main__":
     pass
 

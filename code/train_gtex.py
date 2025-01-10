@@ -155,6 +155,7 @@ def load_trainer(config):
         log_every_n_steps = 1,
         check_val_every_n_epoch = config.valid_metrics_save_freq
     )
+    config.update({'Gradient Accumulation Effective Batch Size': config.num_individuals_per_gene // config.train_batch_size })
     return trainer
 def load_callbacks(config):
     checkpoint_dir = os.path.join(config.save_dir,'checkpoints')

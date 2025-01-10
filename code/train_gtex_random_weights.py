@@ -1,26 +1,5 @@
 from train_gtex import *
-class LitModelHeadAdapterWrapperRandom(LitModel):
-    """Same as LitModelHeadAdapterWrapper but Enformer is loaded using random weights not pre-trained weights"""
-    def __init__(self, tissues_to_train,save_dir,train_dataset,learning_rate,alpha,genes_for_training,genes_for_valid,genes_for_test,eval_test_gene_during_validation = False):
-        super().__init__(tissues_to_train,save_dir,train_dataset,learning_rate,alpha,genes_for_training,genes_for_valid,genes_for_test,eval_test_gene_during_validation)
-
-        random_enformer = Enformer.from_hparams(
-                dim = 1536,
-                depth = 11,
-                heads = 8,
-                output_heads = dict(human = 5313, mouse = 1643),
-                target_length = -1
-            )
-
-        self.model = HeadAdapterWrapper(
-            enformer = random_enformer,
-            num_tracks = len(self.tissues_to_train),
-            post_transformer_embed = False, # important to keep False
-            output_activation = nn.Identity()
-        )
-
-    def forward(self, x):
-        return self.model(x, freeze_enformer = False) 
+from pl_models import LitModelHeadAdapterWrapperRandom
 
 def load_model(random_weights,config,train_ds,train_genes,valid_genes,test_genes,eval_test_gene_during_validation):
     if random_weights:
@@ -135,7 +114,7 @@ def main():
         wandb.config.update({'save_dir' : os.path.join(current_dir,f"../results/{config['experiment_name']}/{model_type}/{train_gene_filename.strip('.txt')}/Fold-{fold}/Seed-{seed}/RandomWeights{random_weights}/{wandb.run.id}")})
         pl.seed_everything(int(wandb.config.seed), workers=True)
         torch.use_deterministic_algorithms(True)
-        train_random_weights(wandb.config,train_genes,valid_genes,test_genes,random_weights = random_weights)
+        train_random_weights(wandb.config,train_genes,valid_genes,test_genes,random_weights = random_weights,validate_first = True)
         wandb.finish()
             
 if __name__ == '__main__':

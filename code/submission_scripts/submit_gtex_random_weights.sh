@@ -1,4 +1,5 @@
-config_path=configs/blood_config.yaml
+# config_path=configs/blood_config.yaml
+config_path=configs/multi_gene_196kb_blood.yaml
 model_type=MultiGene
 seed=0
 

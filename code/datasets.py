@@ -485,7 +485,6 @@ class GTExRefDataset(GTExDataset):
         assert len(gene_df.columns) == len(self.individuals_in_split)
         
         gene_expression_vector[0] = np.mean(gene_df,axis = 1) #average over donors for this gene in this tissue
-        breakpoint()
         return gene_expression_vector
     def __getitem__(self, idx):
         individual = 'RefGenomeAverageExpression' #use arbitrary string as a placeholder. Ref genome & Average expression will be used so this is irrelevant              
@@ -498,7 +497,6 @@ class GTExRefDataset(GTExDataset):
                                                                             region_row['ends'],
                                                                             region_row['gene_name']
                                                                             )
-        breakpoint()
         return dna_vector, expression_vector, region_row['gene_name'],individual,idx
 
     def __len__(self):

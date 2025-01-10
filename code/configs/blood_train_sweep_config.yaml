@@ -1,0 +1,13 @@
+seq_length: 49152
+train_batch_size: 32
+experiment_name: "FinalPaperWholeBlood_RevisionTrainSweep"
+max_epochs: 150
+precision: bf16-mixed
+tissues_to_train: "Whole Blood"
+gradient_clip_val: 0.05
+seed: 0
+patience: 20
+valid_metrics_save_freq: 1
+train_gene_dir: /pollard/data/projects/sdrusinsky/enformer_fine_tuning/data/genes/Whole_Blood/MultiGene
+valid_gene_path: /pollard/data/projects/sdrusinsky/enformer_fine_tuning/data/genes/Whole_Blood/valid_genes.txt
+test_gene_path: /pollard/data/projects/sdrusinsky/enformer_fine_tuning/data/genes/Whole_Blood/test_genes.txt

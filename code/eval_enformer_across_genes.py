@@ -14,15 +14,19 @@ def main():
     parser.add_argument("--desired_seq_len",type=int,help = "Sequence length to used for predictions")
     parser.add_argument("--n_center_bins",type=int,help = "Number of bins flanking TSS to average over")
     parser.add_argument("--outdir",type=str,nargs ='?', help = 'Optional directory to save outputs')
+    parser.add_argument("--log_transform",type=int,default = 0, help = 'Whether to log2 + 2 transform expression values')
 
     args = parser.parse_args()
     desired_seq_len = int(args.desired_seq_len)
     n_center_bins = int(args.n_center_bins)
     outdir = args.outdir
     gtex_tissue = args.gtex_tissue
+    log_transform = args.log_transform
     assert gtex_tissue in ['Whole Blood','Brain - Cortex'],"Only one of these tissues is expected"
     tissues_to_train = [gtex_tissue] #convert to a list for compatibility downstream
 
+    assert log_transform in [0,1]
+    log_transform = bool(log_transform)
     cwd = os.getcwd()
     data_dir = os.path.join(cwd,'../data')
 
@@ -45,9 +49,9 @@ def main():
         )
     enformer.eval()
     enformer.cuda()
-    ds = EvalAcrossGeneDataset(tissues_to_train,test_genes,desired_seq_len,gene_expression_df,data_dir)
+    ds = EvalAcrossGeneDataset(tissues_to_train,test_genes,desired_seq_len,gene_expression_df,data_dir,log_transform)
     dataloader = DataLoader(ds, batch_size = 1 )
-    results_df = pd.DataFrame(columns = ['model','gene','y','y_hat','enformer_tissue','enformer_output_dim','seq_len'])
+    results_df = pd.DataFrame(columns = ['model','gene','y','y_hat','enformer_tissue','enformer_output_dim','seq_len','log_transformed'])
     enformer_tissue_names,enformer_output_dims = get_enformer_output_dim_from_tissue(tissues_to_train)
 
     with torch.no_grad():
@@ -58,7 +62,7 @@ def main():
                 pred = slice_enformer_pred(pred,n_center_bins)
                 for tissue_str, enformer_output in zip(enformer_tissue_names,enformer_output_dims):
                     final_pred = pred[enformer_output].item()
-                results_df.loc[results_df.shape[0],:] = ['enformer',gene,y.item(),final_pred,tissue_str,enformer_output,desired_seq_len]
+                results_df.loc[results_df.shape[0],:] = ['enformer',gene,y.item(),final_pred,tissue_str,enformer_output,desired_seq_len,log_transform]
     results_df.to_csv(filename,index = False)
 
 

@@ -101,7 +101,7 @@ class LitModel(pl.LightningModule):
     def training_step(self, batch, batch_idx):
         x, y,genes,donor,dataloader_idx = batch
         y_hat = self.predict_step(batch,batch_idx)
-        loss = self.loss_fn(y_hat, y) 
+        loss = self.loss_fn(y_hat, y,alpha = self.alpha) 
         self.log('train_loss',loss,batch_size = y.shape[0], on_step = False, on_epoch = True) #accumulates loss over the epoch and only logs the average at the end, to reduce logging overhead
         return {'loss': loss}
     
@@ -140,7 +140,6 @@ class LitModel(pl.LightningModule):
         self.save_eval_results(y_hat,y,donor,rank,gene_name)
     def on_train_epoch_end(self):
         self.train_dataset.shuffle_and_define_epoch() #shuffle dataset. Ensures this occurs on the main process even if num_workers > 0
-        
     def configure_optimizers(self):
         optimizer = torch.optim.AdamW(self.parameters(), lr = self.learning_rate)
         return {
@@ -234,7 +233,7 @@ class MetricLogger(pl.Callback):
         gene_pearsonr = pearson(all_predictions,all_targets)
         gene_r2 = r2_score(all_predictions,all_targets)
 
-        loss_val = loss_fn(all_predictions.unsqueeze(1),all_targets.unsqueeze(1)).cpu().numpy() #unsqueeze because the values per tissue were returned and have shape [batch_size]. Add a tissue dimension, which the loss function expects
+        loss_val = loss_fn(all_predictions.unsqueeze(1),all_targets.unsqueeze(1),pl_module.alpha).cpu().numpy() #unsqueeze because the values per tissue were returned and have shape [batch_size]. Add a tissue dimension, which the loss function expects
         self.metrics_history['pearsonr'].append(gene_pearsonr.detach().cpu().numpy()) 
         self.metrics_history['r2'].append(gene_r2.detach().cpu().numpy()) 
         self.metrics_history['tissue'].append(tissue)

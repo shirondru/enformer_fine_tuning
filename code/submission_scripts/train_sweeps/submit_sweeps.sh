@@ -20,8 +20,8 @@ for num_individuals_per_gene in 32 64; do
     sbatch slurm_num_individuals_per_gene_sweep.sh $num_individuals_per_gene
 done
 
-#train with frozen trunk
-sbatch slurm_freeze_sweep.sh 1
+#train with frozen trunk using default max_epochs and monitor
+sbatch slurm_freeze_sweep.sh 1 150 mean_r2_across_train_genes_across_valid_donors
 
 #train while monitoring valid gene pearson R
 sbatch slurm_monitor_sweep.sh mean_pearsonr_across_valid_genes_across_valid_donors

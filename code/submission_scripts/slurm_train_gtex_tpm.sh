@@ -7,7 +7,7 @@
 #SBATCH --mem=100G
 #SBATCH -o /pollard/data/projects/sdrusinsky/enformer_fine_tuning/logs/train/slurm_stdout/%j.out
 #SBATCH -e /pollard/data/projects/sdrusinsky/enformer_fine_tuning/logs/train/slurm_stderr/%j.err
-#SBATCH --job-name=FreezeSweep
+#SBATCH --job-name=TPM
 
 eval "$(/pollard/home/sdrusinsky/miniforge3/bin/conda shell.bash hook)"
 source /pollard/home/sdrusinsky/miniforge3/bin/activate test_pt231
@@ -17,12 +17,13 @@ export CUBLAS_WORKSPACE_CONFIG=:4096:8
 ## Get absolute path of this script
 SCRIPT_PATH=$(scontrol show job $SLURM_JOBID | awk -F= '/Command=/{print $2}')
 cd "$(dirname "${SCRIPT_PATH}")"
-cd ../..
+cd ..
 echo $SCRIPT_PATH
 echo $(pwd)
 
-freeze_weights=$1
-max_epochs=$2
-monitor=$3
-fold=$4
-python ./train_training_sweep.py --freeze_weights $freeze_weights --max_epochs $max_epochs --monitor $monitor --fold $fold
+
+config_path=$1
+fold=$2
+model_type=$3
+seed=$4
+python ./train_gtex_tpm.py --config_path $config_path --fold $fold --model_type $model_type --seed $seed

@@ -140,7 +140,7 @@ class GTExDataset(Dataset):
         gene_name (list): Gene to get expression from, in the form of a list of length 1. In the scenario where multiple genes align to the same bin, multiple genes are passed in and their summed expression is used
         """
         gene_expression_vector = np.zeros((len(self.tissues_to_train)), dtype=np.float32)
-        indiv_tpm = self.gene_expression_df[['#chr', 'start', 'gene_id','Description', gtex_id]]
+        indiv_tpm = self.gene_expression_df[['gene_id','Description', gtex_id]]
         indiv_tpm = indiv_tpm[indiv_tpm['Description'].isin(gene_name)]
         assert indiv_tpm.shape[0] > 0, f"There is no gene expression data available for gene(s) at position {gene_name}"
         for tissue_idx,tissue in enumerate(self.tissues_to_train):
@@ -168,10 +168,14 @@ class GTExDataset(Dataset):
         
         For example, if num_individuals_per_gene is 128 and there are 550 people with data for the desired tissue, each gradient accumulated batch will include 128 people for the same gene. Thus, data from 128 different random people and the same gene will appear consecutively. Then this will continue for another random gene. 
         Each gene will appear in 3 more gradient accumuated batches, appearing with 512 total random individuals, and the remaining individuals will be dropped this epoch.
+
+
+        NOTE, two experiments with the same hyperparameters and train genes might not train in an identical manner if the genes used to validate/test are different. This is because if the number of valid/test genes differ between the two experiments, the number of times `i` will iterate will differ, changing the random state positional index.
+        Thus, the shuffling of self.genomic_regions_df will differ as the seed value will be different. 
+
         """
 
         self.genomic_regions_df = self.genomic_regions_df.sample(frac=1).reset_index(drop=True) #shuffle dataset. Keep this here so the dataset shuffling within litmodel.on_train_epoch_end persists
-        
         self.indivs_per_epoch = [] #This will be a list of lists. Each inner list will contain list of donors paired to each gene in a gradient accumulated effective batch. There will be as many inner lists as gradient accumulated batches per epoch
         self.region_rows_in_epoch = [] #will contain order of genes. True batches will yield the same gene until the accumulated batch ends, then the next gene will be the next element in this list
         for i in range(0, len(self.genomic_regions_df), 1):
@@ -275,7 +279,8 @@ class EvalAcrossGeneDataset(GTExDataset):
                  requested_regions,
                  desired_seq_len,
                  gene_expression_df,
-                 DATA_DIR): 
+                 DATA_DIR,
+                 log_transform = False): 
         assert len(tissues_to_train) == 1, "This class only supports evaluation across genes 1 gene at a time"
         self.tissue = tissues_to_train[0]
         donor_list_path = os.path.join(DATA_DIR,"cross_validation_folds/gtex/All_GTEx_ID_list.txt") #not using list of donors. Just Reference Genome. So donor list path includes all GTEx individuals so I take average expression among all of them
@@ -284,7 +289,7 @@ class EvalAcrossGeneDataset(GTExDataset):
         self.ref_seq_open = pysam.Fastafile(os.path.join(self.DATA_DIR,"hg38_genome.fa")) #keep ref seq open to use to switch variants to reference allele (i.e, mask them)
         self.metadata = pd.read_csv(os.path.join(self.DATA_DIR,"GTEx_Analysis_v8_Annotations_SampleAttributesDS.txt"),sep='\t')
         self.samples_per_tissue_dict = self.get_sample_ids_for_tissue()
-
+        self.log_transform = log_transform 
     def shuffle_and_define_epoch(self):
         self.genomic_regions_df = self.genomic_regions_df.sample(frac=1).reset_index(drop=True) #shuffle dataset. Keep this here so the dataset shuffling within litmodel.on_train_epoch_end persists
         
@@ -322,6 +327,8 @@ class EvalAcrossGeneDataset(GTExDataset):
         #get all expression columns corresponding to donors with data in the desired tissue
         sample_ids = self.samples_per_tissue_dict[self.tissue]
         gene_df = gene_df[sample_ids]
+        if self.log_transform:
+            gene_df = np.log2(gene_df + 2)
         assert len(gene_df.columns) == len(sample_ids)
         
         gene_expression_vector[0] = np.mean(gene_df)

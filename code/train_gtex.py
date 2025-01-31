@@ -158,21 +158,29 @@ def load_trainer(config):
     config.update({'Gradient Accumulation Effective Batch Size': config.num_individuals_per_gene // config.train_batch_size })
     return trainer
 def load_callbacks(config):
+    mode = 'max'
     checkpoint_dir = os.path.join(config.save_dir,'checkpoints')
     os.makedirs(checkpoint_dir,exist_ok = True)
     if hasattr(config,'monitor'):
         monitor = config.monitor
     else:
         monitor = 'mean_r2_across_train_genes_across_valid_donors'
-    mode = 'max'
-
+    
+    if hasattr(config,'save_top_k'):
+        save_top_k = config.save_top_k
+    else:
+        save_top_k = 1
+    if hasattr(config,'min_delta'):
+        min_delta = config.min_delta
+    else:
+        min_delta = 0
     checkpoint_callback =  ModelCheckpoint(
             dirpath = checkpoint_dir,
-            save_top_k = 1,
+            save_top_k = save_top_k,
             monitor = monitor,
             mode = mode
         )
-    early_stopper = EarlyStopping(monitor = monitor, mode = mode, min_delta = 0, patience = int(config.patience))
+    early_stopper = EarlyStopping(monitor = monitor, mode = mode, min_delta = min_delta, patience = int(config.patience))
     metric_logger = MetricLogger()
     return metric_logger,early_stopper,checkpoint_callback
 def train_gtex(config: wandb.config,

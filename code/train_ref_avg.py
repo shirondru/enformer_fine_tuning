@@ -57,16 +57,19 @@ class RefAvgMetricLogger(MetricLogger):
 
 
 def load_RefAvg_trainer(config):
-    """Overwrite to use `RefAvgMetricLogger` instead of `MetricLogger` """
+    """
+    Overwrite to use `RefAvgMetricLogger` instead of `MetricLogger` 
+    Also overwrite to minimize the loss as opposed to maximize the PearsonR/R2 across individuals. There are no individuals here, so the loss is minimized instead
+    """
 
     ##load callbacks
     checkpoint_dir = os.path.join(config.save_dir,'checkpoints')
     os.makedirs(checkpoint_dir,exist_ok = True)
-    if hasattr(config,'monitor'):
-        monitor = config.monitor
-    else:
-        monitor = 'mean_r2_across_train_genes_across_valid_donors'
-    mode = 'max'
+
+    mode = 'min' ##MINIMIZE LOSS INSTEAD OF MAXIMIZE PEARSONR/R2
+    assert hasattr(config,'monitor')
+    assert config.monitor in ['mean_loss_valid_genes_across_valid_donors','mean_loss_train_genes_across_valid_donors']
+    monitor = config.monitor
 
     checkpoint_callback =  ModelCheckpoint(
             dirpath = checkpoint_dir,
@@ -74,7 +77,11 @@ def load_RefAvg_trainer(config):
             monitor = monitor,
             mode = mode
         )
-    early_stopper = EarlyStopping(monitor = monitor, mode = mode, min_delta = 0, patience = int(config.patience))
+    if hasattr(config,'min_delta'):
+        min_delta = config.min_delta
+    else:
+        min_delta = 0
+    early_stopper = EarlyStopping(monitor = monitor, mode = mode, min_delta = min_delta, patience = int(config.patience))
     metric_logger = RefAvgMetricLogger()
 
 
@@ -96,18 +103,20 @@ def load_ref_avg_datasets(config,train_genes,valid_genes,test_genes):
     """
     Loads GTExRefAvg train and valid datasets, and a personal genomes test dataset.
     Also overwrite `load_trainer` to use RefAvgMetricLogger instead of MetricLogger
+    Use Log2TPM expression values instead of eQTL normalized expression values, which are transformed to appear standard normal. Prefer TPM so expression of each gene isn't 0, and there wouldn't be anything to learn
     """
     tissues_to_train = config.tissues_to_train.split(',') #ex: 'Whole Blood' -> ['Whole Blood]
     assert len(tissues_to_train) == 1, "Multi-tissue training not yet supported"
     tissue_str = tissues_to_train[0].replace(' -','').replace(' ','_').replace('(','').replace(')','')
 
-    #load gene expression df, merge in gene names onto gene ids
-    expression_dir = os.path.join(config.DATA_DIR,"gtex_eqtl_expression_matrix")
-    gene_id_mapping = pd.read_csv(os.path.join(expression_dir,"gene_id_mapping.csv"))
-    df_path = os.path.join(expression_dir,f"{tissue_str}.v8.normalized_expression.bed.gz")
-    gene_expression_df = pd.read_csv(df_path,sep = '\t')
-    gene_expression_df = gene_expression_df.merge(gene_id_mapping, left_on = 'gene_id',right_on = 'Name')
-    
+    gene_expression_df = pd.read_csv(os.path.join(config.DATA_DIR,"gene_tpm_2017-06-05_v8_whole_blood.gct.gz"),sep = '\t',skiprows = 2)
+
+    for col in gene_expression_df.columns:
+        if col.startswith('GTEX'):
+            gene_expression_df = gene_expression_df.rename(columns = {col:'-'.join(col.split('-')[:2])})
+    #log2 transform expression columns
+    gene_expression_df.loc[:,[col for col in gene_expression_df.columns if col.startswith('GTEX')]] = np.log2(gene_expression_df.loc[:,[col for col in gene_expression_df.columns if col.startswith('GTEX')]] + 2)
+    gene_expression_df = gene_expression_df.rename(columns = {'Name':'gene_id'}) #make compatible with dataset
 
     genes_to_train = train_genes
     genes_to_validate = train_genes + valid_genes

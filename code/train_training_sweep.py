@@ -41,7 +41,7 @@ def train_gtex_sweep(config: wandb.config,
     """ Overwrite to use LitModelHeadAdapterSweep to enable freezing weights"""
     ensure_no_gene_overlap(train_genes,valid_genes,test_genes,eval_test_gene_during_validation)
     define_donor_paths(config,'gtex')
-
+    
     train_ds, valid_ds, test_ds = load_gtex_datasets(config,train_genes, valid_genes,test_genes)
     os.makedirs(config.save_dir,exist_ok = True)
     model = LitModelHeadAdapterSweep(
@@ -73,7 +73,7 @@ def main():
     parser.add_argument("--num_individuals_per_gene", type = int, nargs = '?',default = 128) #
     parser.add_argument("--freeze_weights", type = int, nargs = '?',default = 0) #
     parser.add_argument("--monitor", type = str, nargs = '?', default = 'mean_r2_across_train_genes_across_valid_donors') #
-
+    parser.add_argument("--max_epochs", type = int, nargs = '?', default = 150) #To train frozen enformer with unlimited epochs
 
     model_type = 'MultiGene'
     config_path = "/pollard/data/projects/sdrusinsky/enformer_fine_tuning/code/configs/blood_train_sweep_config.yaml"
@@ -84,6 +84,7 @@ def main():
     lr = args.lr
     alpha = args.alpha
     num_individuals_per_gene = args.num_individuals_per_gene
+    max_epochs = args.max_epochs
     freeze_weights = args.freeze_weights
     monitor = args.monitor
 
@@ -111,7 +112,7 @@ def main():
     assert config['num_individuals_per_gene'] % config['train_batch_size'] == 0 #should be perfectly divisable
     config['monitor'] = monitor 
     config['freeze_weights'] = freeze_weights
-
+    config['max_epochs'] = max_epochs
     train_gene_filedir, train_gene_filenames, valid_genes, test_genes = prepare_genes(config)
     #if training a single gene model, loop through all single gene files in the dir. If its a multi gene model, there is only 1 train gene file and loop will exit after 1 iteration
     for train_gene_filename in train_gene_filenames:

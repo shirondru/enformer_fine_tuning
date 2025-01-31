@@ -52,7 +52,6 @@ def train_random_weights(config: wandb.config,
                 ) 
     trainer.test(model, DataLoader(test_ds,batch_size = 1), ckpt_path = 'best')
 
-
 def main():
     """
     Changes from normal personal genome training:

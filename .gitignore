@@ -13,3 +13,6 @@ data/GTEx_Analysis_2017-06-05_v8_WholeGenomeSeq_838Indiv_Analysis_Freeze_SNPsOnl
 data/expression-rosmap.parquet
 data/hg38_genome.fa*
 data/GTEx_gene_tpm.csv
+data/tmp/*
+data/VCF
+data/gene_tpm_2017-06-05_v8_whole_blood.gct.gz

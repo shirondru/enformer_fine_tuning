@@ -1,9 +1,10 @@
 import torch
 import pandas as pd
 import os
+import sys
 import lightning.pytorch as pl
 from scipy.stats import pearsonr
-from datasets import GTExDataset
+from datasets import GTExDataset,GTExRefDataset
 from torch.utils.data import DataLoader
 from scipy.ndimage import gaussian_filter
 import numpy as np
@@ -37,58 +38,70 @@ def instantiate_dataset(gene_list,donor_path,seq_len,tissues_to_train):
         gene_expression_df,
         data_dir
     )
-    return ds
 
-def test_proper_load(model,save_dir,ckpt,row,valid_ds):
+    ref_ds = GTExRefDataset(tissues_to_train,
+                            gene_list,
+                            seq_len,
+                            donor_path,
+                            gene_expression_df,
+                            data_dir)
+    return ds,ref_ds
+
+def test_proper_load(model,save_dir,ckpt,valid_ds,precision,atol = 1e-05):
     """
     Tests proper loading of model by asserting that predicted values at the epoch match what was reported during training
     """
+    assert precision == 'bf16-mixed', "This test autocasts to torch.bfloat16 because it assumes the model was trained with this precision. The test will fail otherwise"
     ckpt_epoch = int(ckpt.split('epoch=')[-1].split('-')[0])
     valid_preds = pd.read_csv(os.path.join(save_dir,f"Prediction_Results_{ckpt_epoch}_in_valid_donors.csv"))
   
     model.eval()
     model.cuda()
     dl = DataLoader(valid_ds, batch_size = 1)
-    n_tests = 10
-    i = 0
     logged_preds = []
     loaded_preds = []
     with torch.no_grad():
-        for x, y,gene,donor,batch_idx in dl:
-            y_pred = performer_predict(model,x)
-            assert y_pred.dim() == 2 #only 2 dims left after removing sequence axis
+        with torch.autocast(device_type='cuda', dtype=torch.bfloat16):
+            for x, y,gene,donor,batch_idx in dl:
+                y_pred = performer_predict(model,x)
+                assert y_pred.dim() == 2 #only 2 dims left after removing sequence axis
 
-            assert y.dim() == y_pred.dim() == 2
-            assert y.shape[0] == 1
-            assert y_pred.shape[0] == 1
-            assert len(donor) == len(gene) == 1
-            donor = donor[0]
-            gene = gene[0]
+                assert y.dim() == y_pred.dim() == 2
+                assert y.shape[0] == 1
+                assert y_pred.shape[0] == 1
+                assert len(donor) == len(gene) == 1
+                donor = donor[0]
+                gene = gene[0]
 
-            valid_preds_i = valid_preds[(valid_preds['gene'] == gene) & (valid_preds['donor'] == donor)]
-            for i in range(y.shape[1]): #iterate over tissues, if applicable
-                tissue_y = y[0,i]
-                if not torch.isnan(tissue_y):
-                    tissue_y_pred = y_pred[0,i]
-                    tissue_str = model.tissues_to_train[i]
-                    expected = valid_preds_i[valid_preds_i['tissue'] == tissue_str]
-                    assert np.allclose(expected['y_pred'].item(),tissue_y_pred.cpu().item(), atol = 0.05) #offer flexible tolerance due to machine precision, different GPUs for inference, and small original values
-                    assert np.allclose(expected['y_true'].item(),tissue_y.cpu().item())
+                valid_preds_i = valid_preds[(valid_preds['gene'] == gene) & (valid_preds['donor'] == donor)]
+                for i in range(y.shape[1]): #iterate over tissues, if applicable
+                    tissue_y = y[0,i]
+                    if not torch.isnan(tissue_y):
+                        tissue_y_pred = y_pred[0,i]
+                        tissue_str = model.tissues_to_train[i]
+                        expected = valid_preds_i[valid_preds_i['tissue'] == tissue_str]
 
-                    logged_preds.append(expected['y_pred'].item())
-                    loaded_preds.append(tissue_y_pred.cpu().item())
+                        assert np.allclose(expected['y_pred'].item(),tissue_y_pred.cpu().item(), atol = atol)
+                        assert np.allclose(expected['y_true'].item(),tissue_y.cpu().item())
 
+                        logged_preds.append(expected['y_pred'].item())
+                        loaded_preds.append(tissue_y_pred.cpu().item())
+    #visual confirmation that loaded and logged predicitions are identical
+    print("Logged",logged_preds[:3])
+    print("Loaded",loaded_preds[:3])
+    max_diff = np.array(loaded_preds) - np.array(logged_preds)
+    print('Max Difference', np.max(max_diff))
     assert pearsonr(logged_preds,loaded_preds)[0].item() > 0.95 #predictions saved during validation and those made from same people after reloading should be tightly correlated
     print("Model Loaded Successfully!")
-    
 def performer_predict(model,x):
     y_hat = model(x.cuda())
     y_hat = y_hat[:,y_hat.shape[1]//2,:] #keep value at center of sequence. The sequence axis is removed
     return y_hat
 
+
 def enformer_predict(model,x,n_center_bins):
     pred = model(x.cuda())['human']
-    pred = slice_enformer_pred(pred,n_center_bins) #remove track axis
+    pred = slice_enformer_pred(pred,n_center_bins,detach = False) #remove track axis
 
     _,enformer_output = get_enformer_output_dim_from_tissue(['Whole Blood'])
     pred = pred[enformer_output].unsqueeze(0) #get desired output. Keep batch axis
@@ -148,8 +161,7 @@ def check_if_done(run_id,outdir,skip_check,gene):
     path = os.path.join(outdir,'gradients',run_id,gene)
     return os.path.exists(path)
 
-def get_enformer_grads(outdir,gene_list,tissues_to_train = ['Whole Blood'],desired_seq_len = 49152):
-    skip_check = False
+def analyze_enformer(outdir,gene_list,tissues_to_train = ['Whole Blood'],desired_seq_len = 49152,analysis = 'grad_input',skip_check = False):
     model_name = 'enformer'
     assert tissues_to_train == ['Whole Blood'],"Need to update enformer_predict to accomodate different tissues"
     model = Enformer.from_pretrained(
@@ -166,15 +178,20 @@ def get_enformer_grads(outdir,gene_list,tissues_to_train = ['Whole Blood'],desir
         for gene in gene_list:
             is_done = check_if_done(run_id,outdir,skip_check,gene)
             if not is_done:
-                dataset = instantiate_dataset([gene], #one gene in the dataset
+                dataset,ref_dataset = instantiate_dataset([gene], #one gene in the dataset
                                                     test_donor_path,
                                                     desired_seq_len,
                                                     tissues_to_train)
                 dl = DataLoader(dataset, batch_size=1, shuffle=False) 
-                get_input_grads(dl,model_name,model,outdir,run_id)
+                ref_dl = DataLoader(ref_dataset, batch_size=1, shuffle=False)
+                if analysis == 'grad_input':
+                    get_input_grads(dl,model_name,model,outdir,run_id)
+                    get_input_grads(ref_dl,model_name,model,
+                                        os.path.join(outdir,'ref_genome'),
+                                        run_id)
         print(f"{fold}")    
     
-def get_performer_grads(metadata,outdir,genes_to_add = None,skip_check = False,only_genes = None):
+def analyze_performer(metadata,outdir,genes_to_add = None,skip_check = False,only_genes = None,analysis = 'grad_input'):
     for idx, row in metadata.iterrows():
         run_id = row['ID']
         tissues_to_train = row['tissues_to_train'].strip('"[]"').split(',')
@@ -183,6 +200,7 @@ def get_performer_grads(metadata,outdir,genes_to_add = None,skip_check = False,o
         save_dir = row['save_dir']
         test_donor_path = row['test_donor_path']
         valid_donor_path = row['valid_donor_path']
+        precision = row['precision']
         train_genes = row['genes_for_training'].replace('[','').replace(']','').replace('"','').split(',')
         valid_genes = row['genes_for_valid'].replace('[','').replace(']','').replace('"','').split(',')
         test_genes = row['genes_for_test'].replace('[','').replace(']','').replace('"','').split(',')
@@ -201,23 +219,31 @@ def get_performer_grads(metadata,outdir,genes_to_add = None,skip_check = False,o
 
         model = load_model(ckpt,save_dir,run_id)
         valid_dataset = instantiate_dataset([train_genes[0]],valid_donor_path,desired_seq_len, tissues_to_train)
-        test_proper_load(model,save_dir,ckpt,row,valid_dataset)
+        test_proper_load(model,save_dir,ckpt,valid_dataset,precision,atol = 1e-05)
         assert not model.training
         assert next(model.parameters()).is_cuda
 
         gene_list = sorted(gene_list)
         for idx2,gene in enumerate(gene_list):
             print(f"{run_id} {idx}/{len(metadata)}\t Gene: {idx2} / {len(gene_list)}")
+            sys.stdout.flush()
             is_done = check_if_done(run_id,outdir,skip_check,gene)
             if not is_done:
-                test_dataset = instantiate_dataset([gene], #one gene in the dataset
+                test_dataset,ref_dataset = instantiate_dataset([gene], #one gene in the dataset
                                                 test_donor_path,
                                                 desired_seq_len,
                                                 tissues_to_train)
 
                 dl = DataLoader(test_dataset, batch_size=1, shuffle=False) 
-                get_input_grads(dl,'performer',model,outdir,run_id)
-                test_proper_load(model,save_dir,ckpt,row)
+                ref_dl =DataLoader(ref_dataset, batch_size=1, shuffle=False)  
+                with torch.autocast(device_type='cuda', dtype=torch.bfloat16):
+                    if analysis == 'grad_input':
+                        get_input_grads(dl,'performer',model,
+                                        os.path.join(outdir,'personal_genomes'),
+                                        run_id)
+                        get_input_grads(ref_dl,'performer',model,
+                                        os.path.join(outdir,'ref_genome'),
+                                        run_id)
             
 def main():
     parser = argparse.ArgumentParser(description="For ISM")
@@ -225,38 +251,39 @@ def main():
     parser.add_argument("--model_name",type=str, help = 'One of SingleGene or MultiGene or Enformer')
     parser.add_argument("--path_to_only_genes_file",type=str,nargs ='?', help = 'Optional path to a txt file containing an explicit set of genes to evaluate. Each gene must be on its own row')
     parser.add_argument("--enformer_seq_len",type=int,nargs ='?', help = 'seq_len to use with Enformer')
+    parser.add_argument("--skip_check",type=int,default = 0, help = "Whether to skip checking if a gene has already been evaluated. This will cause the gene to be evaluated again")
 
     
     args = parser.parse_args()
-    metadata = args.metadata
+    path_to_metadata = args.path_to_metadata
     model_name = args.model_name
     path_to_only_genes_file = args.path_to_only_genes_file
     enformer_seq_len = args.enformer_seq_len
-    gene_list = parse_gene_files(path_to_only_genes_file)
+    skip_check = bool(args.skip_check)
+    if path_to_only_genes_file is not None:
+        gene_list = parse_gene_files(path_to_only_genes_file)
+    else:
+        gene_list = None # When no gene path is defined, genes used during training,validation, and test are used instead (From metadata)
 
+    
     outdir = f'/pollard/data/projects/sdrusinsky/enformer_fine_tuning/results/RevisionGradInput/{model_name}'
 
     if model_name in ['SingleGene','MultiGene']:
-        assert metadata is not None
-        if len(gene_list) == 0: #if desired genes were passed, evaluate on those. Otherwise convert to None so this flag is skipped
-            gene_list = None
-        get_performer_grads(metadata,outdir,only_genes = gene_list)
+        metadata = pd.read_csv(path_to_metadata)
+        print('cuda',torch.version.cuda)
+        sys.stdout.flush()
+        analyze_performer(metadata,outdir,only_genes = gene_list,analysis = 'grad_input',skip_check = skip_check)
+
 
     else:
         assert model_name == 'Enformer'
-        assert metadata is None
+        assert path_to_metadata is None
         tissues_to_train = ['Whole Blood']
         assert enformer_seq_len in [49152, 196608]
-        get_enformer_grads(outdir,gene_list,tissues_to_train,enformer_seq_len)
+        analyze_enformer(outdir,gene_list,tissues_to_train,enformer_seq_len,analysis = 'grad_input',skip_check = skip_check)
 
 if __name__ == '__main__':
     main()
-
-## TODO:
-# generate a list of ~30 genes. 15 high heritability 15 low heritability and only evaluate models that include those
-# include test genes separately
-# MultiGene and SingleGene models need to be handled separately. MultiGene need to be evaluated on each of these genes. SingleGene models need to be evaluated on only the single train gene as well as the test genes
-
 
 
     

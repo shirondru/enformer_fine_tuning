@@ -123,6 +123,10 @@ class GTExDataset(Dataset):
     def get_path_to_consensus_seq(self,donor_id, haplotype_num):
         return os.path.join(self.consensus_seq_dir, f"{donor_id}_consensus_H{haplotype_num}.fa")
     def _get_single_GTEx_donor_sequence(self,gtex_id,region_chr,region_start,region_end):
+        """
+        Pysam.Fastafile assumes 0-based indexing when regions are given like below. 
+        Variants in human-readable formats like VCF tend to be 1-based. To find them, region_start = pos - 1, region_end = pos
+        """
         consensus1_open = pysam.Fastafile(self.get_path_to_consensus_seq(gtex_id,1))
         consensus2_open = pysam.Fastafile(self.get_path_to_consensus_seq(gtex_id,2))
         seq1 = consensus1_open.fetch(region_chr, region_start, region_end).upper()

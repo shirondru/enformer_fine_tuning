@@ -36,7 +36,8 @@ def train_random_weights(config: wandb.config,
                test_genes: list,
                eval_test_gene_during_validation: bool = False,
                validate_first: bool = False,
-               random_weights: bool = True) -> None:
+               random_weights: bool = True,
+               keep_checkpoint: bool = True) -> None:
     """ Overwrite to use `LitModelHeadAdapterWrapperRandom`"""
     ensure_no_gene_overlap(train_genes,valid_genes,test_genes,eval_test_gene_during_validation)
     define_donor_paths(config,'gtex')
@@ -51,7 +52,8 @@ def train_random_weights(config: wandb.config,
                 val_dataloaders = DataLoader(valid_ds, batch_size = 1) #code for logging and storing validation/test results expects batch size of 1 for these 
                 ) 
     trainer.test(model, DataLoader(test_ds,batch_size = 1), ckpt_path = 'best')
-
+    if not keep_checkpoint:
+        delete_checkpoint(trainer)
 def main():
     """
     Changes from normal personal genome training:
@@ -65,7 +67,7 @@ def main():
     parser.add_argument("--model_type",type=str)
     parser.add_argument("--seed", type = int, nargs='?')
     parser.add_argument("--random_weights", type = int, nargs='?')
-
+    parser.add_argument("--keep_checkpoint", type = int, nargs='?',default = 1)
 
     args = parser.parse_args()
     config_path = args.config_path
@@ -73,9 +75,12 @@ def main():
     seed = args.seed
     model_type = args.model_type
     random_weights = args.random_weights
+    keep_checkpoint = args.keep_checkpoint
     assert model_type in ['SingleGene','MultiGene']
     assert random_weights in [0,1]
     random_weights = bool(random_weights)
+    assert keep_checkpoint in [0,1]
+    keep_checkpoint = bool(keep_checkpoint)
 
     current_dir = os.path.dirname(__file__)
     DATA_DIR = os.path.join(current_dir,'../data')
@@ -113,7 +118,7 @@ def main():
         wandb.config.update({'save_dir' : os.path.join(current_dir,f"../results/{config['experiment_name']}/{model_type}/{train_gene_filename.strip('.txt')}/Fold-{fold}/Seed-{seed}/RandomWeights{random_weights}/{wandb.run.id}")})
         pl.seed_everything(int(wandb.config.seed), workers=True)
         torch.use_deterministic_algorithms(True)
-        train_random_weights(wandb.config,train_genes,valid_genes,test_genes,random_weights = random_weights,validate_first = True)
+        train_random_weights(wandb.config,train_genes,valid_genes,test_genes,random_weights = random_weights,validate_first = True, keep_checkpoint = keep_checkpoint)
         wandb.finish()
             
 if __name__ == '__main__':

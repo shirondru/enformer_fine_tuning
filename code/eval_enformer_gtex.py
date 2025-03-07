@@ -70,7 +70,7 @@ def get_enformer_output_dim_from_tissue(tissues_to_train):
             enformer_output_dims.append(enformer_output_dim)
     return enformer_tissue_names,enformer_output_dims
 
-def slice_enformer_pred(pred,n_center_bins, arr_center = None):
+def slice_enformer_pred(pred,n_center_bins, arr_center = None,detach = True):
     """
     Takes either the center bin and returns the array, or takes the 3 center bins and computes the sum over those 3 bins and returns the sequence
     The enformer output dimension is left untouched and will be indexed separately
@@ -81,11 +81,14 @@ def slice_enformer_pred(pred,n_center_bins, arr_center = None):
     if arr_center is None: #if no center bin is defined, use the center of the input sequence. Otherwise, take center bins around the defined center bin
         arr_center = pred.shape[1] // 2
     if n_center_bins == 1:
-        pred = pred[0,arr_center,:].detach().cpu()
+        pred = pred[0,arr_center,:]
     elif n_center_bins == 3:
-        pred = pred[0,arr_center - 1 : arr_center + 2,:].sum(axis = 0).detach().cpu() #take 3 center bins and sum over them. Keep enformer output dimension for now, it will be selected below
+        pred = pred[0,arr_center - 1 : arr_center + 2,:].sum(axis = 0) #take 3 center bins and sum over them. Keep enformer output dimension for now, it will be selected below
     else:
-        pred = pred[0,arr_center - (n_center_bins // 2) : arr_center + (n_center_bins // 2),:].sum(axis = 0).detach().cpu()
+        pred = pred[0,arr_center - (n_center_bins // 2) : arr_center + (n_center_bins // 2),:].sum(axis = 0)
+    
+    if detach:
+        pred = pred.detach().cpu()
     return pred
 
 def get_enformer_predictions(seq_length,test_dataloader,tissue_str_list,desired_enformer_outputs,n_center_bins):

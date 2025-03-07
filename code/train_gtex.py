@@ -11,7 +11,12 @@ from torch.utils.data import DataLoader
 import warnings
 warnings.filterwarnings('ignore', '.*does not have many workers.*')
 
-
+def delete_checkpoint(trainer):
+    """ Delete checkpoint after training and testing"""
+    checkpoint_callbacks = [cb for cb in trainer.callbacks if isinstance(cb, ModelCheckpoint)]
+    assert len(checkpoint_callbacks) == 1
+    checkpoint_callback = checkpoint_callbacks[0]
+    os.remove(checkpoint_callback.best_model_path)
 def parse_gene_files(filepath):
     """
     For parsing txt files containing one gene name per row

@@ -87,6 +87,7 @@ def main():
     2. Force the usage of Whole Blood tissue to ensure a gene expression dataframe from a different tissue is not inadvertantly used.
     3. Use Log2(TPM) + 2 data from Whole Blood as as opposed to the GTEx expression data normalized for eQTL studies, which are transformed to appear standard normal.
         TPM data contains information about avearge expression of the gene in a given tissue relative to other genes in the same tissue. The other dataset does not (expression is centered around 0 and emphasizes differences between people)
+        Still using personal genome seqeunces
     4. For single gene models, train on a random subset of 25 single genes instead of all 301
     """
     parser = argparse.ArgumentParser(description="Run a training experiment")

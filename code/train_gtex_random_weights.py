@@ -2,7 +2,12 @@ from train_gtex import *
 from pl_models import LitModelHeadAdapterWrapperRandom
 
 def load_model(random_weights,config,train_ds,train_genes,valid_genes,test_genes,eval_test_gene_during_validation):
+    
     if random_weights:
+        if hasattr(config,'weight_decay'):
+            weight_decay = float(config.weight_decay)
+        else:
+            weight_decay = None
         model = LitModelHeadAdapterWrapperRandom(
         config.tissues_to_train.split(','),
         config.save_dir,
@@ -12,7 +17,8 @@ def load_model(random_weights,config,train_ds,train_genes,valid_genes,test_genes
         train_genes,
         valid_genes,
         test_genes,
-        eval_test_gene_during_validation
+        eval_test_gene_during_validation,
+        weight_decay = weight_decay #for trying smaller weight decay with random weights
         )
         config.update({'Random Weights':True})
     else:

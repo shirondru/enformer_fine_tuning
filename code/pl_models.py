@@ -39,7 +39,7 @@ def remove_l_tri_flatten_3d(diff):
     return flat[~torch.isnan(flat)]
 
 class LitModel(pl.LightningModule):
-    def __init__(self,tissues_to_train,save_dir,train_dataset,learning_rate,alpha,genes_for_training,genes_for_valid,genes_for_test,eval_test_gene_during_validation = False):
+    def __init__(self,tissues_to_train,save_dir,train_dataset,learning_rate,alpha,genes_for_training,genes_for_valid,genes_for_test,eval_test_gene_during_validation = False,weight_decay = None):
         super(LitModel, self).__init__()
         self.save_hyperparameters()
         self.pred_dict = {}
@@ -54,6 +54,7 @@ class LitModel(pl.LightningModule):
         self.genes_for_test = genes_for_test
         self.learning_rate = learning_rate
         self.alpha = alpha
+        self.weight_decay = weight_decay
         self.ensure_no_gene_overlap(eval_test_gene_during_validation)
 
     def ensure_no_gene_overlap(self,eval_test_gene_during_validation):
@@ -141,7 +142,10 @@ class LitModel(pl.LightningModule):
     def on_train_epoch_end(self):
         self.train_dataset.shuffle_and_define_epoch() #shuffle dataset. Ensures this occurs on the main process even if num_workers > 0
     def configure_optimizers(self):
-        optimizer = torch.optim.AdamW(self.parameters(), lr = self.learning_rate)
+        if self.weight_decay is None: #use default
+            optimizer = torch.optim.AdamW(self.parameters(), lr = self.learning_rate)
+        else:
+            optimizer = torch.optim.AdamW(self.parameters(), lr = self.learning_rate,weight_decay = self.weight_decay)
         return {
             'optimizer': optimizer
         }
@@ -167,8 +171,8 @@ class LitModelHeadAdapterWrapper(LitModel):
 
 class LitModelHeadAdapterWrapperRandom(LitModel):
     """Same as LitModelHeadAdapterWrapper but Enformer is loaded using random weights not pre-trained weights"""
-    def __init__(self, tissues_to_train,save_dir,train_dataset,learning_rate,alpha,genes_for_training,genes_for_valid,genes_for_test,eval_test_gene_during_validation = False):
-        super().__init__(tissues_to_train,save_dir,train_dataset,learning_rate,alpha,genes_for_training,genes_for_valid,genes_for_test,eval_test_gene_during_validation)
+    def __init__(self, tissues_to_train,save_dir,train_dataset,learning_rate,alpha,genes_for_training,genes_for_valid,genes_for_test,eval_test_gene_during_validation = False,weight_decay = None):
+        super().__init__(tissues_to_train,save_dir,train_dataset,learning_rate,alpha,genes_for_training,genes_for_valid,genes_for_test,eval_test_gene_during_validation,weight_decay)
 
         random_enformer = Enformer.from_hparams(
                 dim = 1536,

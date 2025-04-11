@@ -5,13 +5,14 @@
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-gpu=8
 #SBATCH --mem=100G
-#SBATCH -o /pollard/data/projects/sdrusinsky/enformer_fine_tuning/logs/train/slurm_stdout/%j.out
-#SBATCH -e /pollard/data/projects/sdrusinsky/enformer_fine_tuning/logs/train/slurm_stderr/%j.err
-#SBATCH --job-name=RevisionRandomWeights
+#SBATCH -o /pollard/data/projects/sdrusinsky/enformer_fine_tuning/logs/ISM/slurm_stdout/%j.out
+#SBATCH -e /pollard/data/projects/sdrusinsky/enformer_fine_tuning/logs/ISM/slurm_stderr/%j.err
+#SBATCH --job-name=ISM_SG_Blood
 
 eval "$(/pollard/home/sdrusinsky/miniforge3/bin/conda shell.bash hook)"
 source /pollard/home/sdrusinsky/miniforge3/bin/activate test_pt231
 export CUBLAS_WORKSPACE_CONFIG=:4096:8
+
 
 ## from https://stackoverflow.com/questions/56962129/how-to-get-original-location-of-script-used-for-slurm-job
 ## Get absolute path of this script
@@ -21,11 +22,8 @@ cd ..
 echo $SCRIPT_PATH
 echo $(pwd)
 
+path_to_metadata=/pollard/data/projects/sdrusinsky/enformer_fine_tuning/code/metadata_from_past_runs/wandb_revision_train_random_higherLR.csv
+script_path=./ism_performer.py
+model_type=SingleGene
 
-config_path=$1
-fold=$2
-seed=$3
-model_type=$4
-random_weights=$5
-keep_checkpoint=$6
-python ./train_gtex_random_weights.py --config_path $config_path --fold $fold --seed $seed --model_type $model_type --random_weights $random_weights --keep_checkpoint $keep_checkpoint
+python $script_path --path_to_metadata $path_to_metadata --model_type $model_type

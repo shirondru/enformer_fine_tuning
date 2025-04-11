@@ -1,0 +1,17 @@
+#for testing whether we can train on high h2 genes from random weights if i increase learning rate, allow more patience and more epochs. Using a shorter sequence to speed things up
+seq_length: 49152
+learning_rate: 1e-5
+train_batch_size: 32
+num_individuals_per_gene: 128
+alpha: 0.5
+experiment_name: "test_random_weights_higher_lr"
+max_epochs: 500
+precision: bf16-mixed
+tissues_to_train: "Whole Blood"
+gradient_clip_val: 0.05
+seed: 0
+patience: 500
+valid_metrics_save_freq: 1
+train_gene_path: /pollard/data/projects/sdrusinsky/enformer_fine_tuning/data/genes/Whole_Blood/high_h2_mg_revisions/top100_r2.txt
+valid_gene_path: /pollard/data/projects/sdrusinsky/enformer_fine_tuning/data/genes/empty.txt
+test_gene_path: /pollard/data/projects/sdrusinsky/enformer_fine_tuning/data/genes/empty.txt

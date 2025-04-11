@@ -1,4 +1,4 @@
-Welcome to the Performer repository! This repository is meant to fine-tune sequence-to-expression models using paired whole genome sequencing (WGS) and gene expression data. We focus on [Enformer](https://www.nature.com/articles/s41592-021-01252-x), although the code used here can be adapted to other models.
+Welcome to the Variformer repository! This repository is meant to fine-tune sequence-to-expression models using paired whole genome sequencing (WGS) and gene expression data. We focus on [Enformer](https://www.nature.com/articles/s41592-021-01252-x), although the code used here can be adapted to other models.
 
 Our preprint is out! Find it [here](https://www.biorxiv.org/content/10.1101/2024.07.27.605449v1)
 
@@ -46,7 +46,7 @@ mv GTEx_Analysis_v8_eQTL_expression_matrices/Whole_Blood.v8.normalized_expressio
 ```
 
 # Example Usage
-To train single-gene and multi-gene Performer models on Whole Blood GTEx data using ~300 genes, run:
+To train single-gene and multi-gene Variformer models on Whole Blood GTEx data using ~300 genes, run:
 ```
 sh .code/submission_scripts/submit_gtex.sh
 ```

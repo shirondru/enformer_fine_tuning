@@ -50,6 +50,9 @@ class RefAvgMetricLogger(MetricLogger):
         self.get_epoch(trainer,pl_module)
         self.log_predictions(trainer,pl_module,'valid') #log predictions but nothing else
         self.log_all_loss_vals(pl_module,'valid')
+        pl_module.pred_dict = {}
+        pl_module.target_dict = {}
+        pl_module.donor_dict = {}
     def on_test_epoch_end(self,trainer,pl_module):
         self.metrics_history = {'epoch': [],'pearsonr':[], 'r2':[],'gene_name': [],'tissue': [],'per_gene_tissue_val_loss': [],'gene_split':[],'donor_split': []}
         self.log_and_save_eval(trainer,pl_module,'test')   
@@ -143,7 +146,7 @@ def train_ref_avg(config: wandb.config,
     """
     ensure_no_gene_overlap(train_genes,valid_genes,test_genes,eval_test_gene_during_validation)
     define_donor_paths(config,'gtex')
-
+    breakpoint()
     train_ds, valid_ds, test_ds = load_ref_avg_datasets(config,train_genes, valid_genes,test_genes)
     model = RefAvgModel(
         config.tissues_to_train.split(','),
@@ -157,6 +160,7 @@ def train_ref_avg(config: wandb.config,
         eval_test_gene_during_validation
         )
     trainer = load_RefAvg_trainer(config)
+    breakpoint()
     if validate_first:
         trainer.validate(model = model, dataloaders = DataLoader(valid_ds, batch_size = 1))
     trainer.fit(model = model,

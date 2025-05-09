@@ -16,3 +16,4 @@ data/GTEx_gene_tpm.csv
 data/tmp/*
 data/VCF
 data/gene_tpm_2017-06-05_v8_whole_blood.gct.gz
+test/expected_results

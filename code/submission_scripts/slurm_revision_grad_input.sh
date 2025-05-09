@@ -30,35 +30,42 @@ path_to_metadata=/pollard/data/projects/sdrusinsky/enformer_fine_tuning/code/met
 model_name=MultiGene
 
 #evaluate multi gene model on 15 high h2 genes
-path_to_only_genes_file=/pollard/data/projects/sdrusinsky/enformer_fine_tuning/data/genes/Whole_Blood/attributions_revisions/high_h2_genes.txt
-python ./new_attr.py --path_to_metadata $path_to_metadata --model_name $model_name --path_to_only_genes_file $path_to_only_genes_file --attribution $attribution
+# path_to_only_genes_file=/pollard/data/projects/sdrusinsky/enformer_fine_tuning/data/genes/Whole_Blood/attributions_revisions/high_h2_genes.txt
+# python ./new_attr.py --path_to_metadata $path_to_metadata --model_name $model_name --path_to_only_genes_file $path_to_only_genes_file --attribution $attribution
 
 #repeat multi gene models with other genes
-path_to_only_genes_file=/pollard/data/projects/sdrusinsky/enformer_fine_tuning/data/genes/Whole_Blood/attributions_revisions/other_genes.txt
-python ./new_attr.py --path_to_metadata $path_to_metadata --model_name $model_name --path_to_only_genes_file $path_to_only_genes_file --attribution $attribution
+# path_to_only_genes_file=/pollard/data/projects/sdrusinsky/enformer_fine_tuning/data/genes/Whole_Blood/attributions_revisions/other_genes.txt
+# python ./new_attr.py --path_to_metadata $path_to_metadata --model_name $model_name --path_to_only_genes_file $path_to_only_genes_file --attribution $attribution
 
 #repeat multi gene models with test genes
-path_to_only_genes_file=/pollard/data/projects/sdrusinsky/enformer_fine_tuning/data/genes/Whole_Blood/test_genes.txt
-python ./new_attr.py --path_to_metadata $path_to_metadata --model_name $model_name --path_to_only_genes_file $path_to_only_genes_file --attribution $attribution
+# path_to_only_genes_file=/pollard/data/projects/sdrusinsky/enformer_fine_tuning/data/genes/Whole_Blood/test_genes.txt
+# python ./new_attr.py --path_to_metadata $path_to_metadata --model_name $model_name --path_to_only_genes_file $path_to_only_genes_file --attribution $attribution
+
+#repeat with remaining 271 train genes using *** only ref genome grad ***
+path_to_only_genes_file=/pollard/data/projects/sdrusinsky/enformer_fine_tuning/data/genes/Whole_Blood/attributions_revisions/remaining_genes.txt
+python ./new_attr.py --path_to_metadata $path_to_metadata --model_name $model_name --path_to_only_genes_file $path_to_only_genes_file --attribution ref_only_grad_input
 
 #### single gene models. Don't pass in gene file so the genes used during training each of the single gene models are used instead ####
-path_to_metadata=/pollard/data/projects/sdrusinsky/enformer_fine_tuning/code/metadata_from_past_runs/revision_attributions_FinalPaperWholeBlood_SingleGene.csv
-model_name=SingleGene
-python ./new_attr.py --path_to_metadata $path_to_metadata --model_name $model_name --attribution $attribution
+# path_to_metadata=/pollard/data/projects/sdrusinsky/enformer_fine_tuning/code/metadata_from_past_runs/revision_attributions_FinalPaperWholeBlood_SingleGene.csv
+# model_name=SingleGene
+# python ./new_attr.py --path_to_metadata $path_to_metadata --model_name $model_name --attribution $attribution
 
 
 ### Enformer####
 model_name=Enformer
 enformer_seq_len=49152
 # 15 high h2 genes
-path_to_only_genes_file=/pollard/data/projects/sdrusinsky/enformer_fine_tuning/data/genes/Whole_Blood/attributions_revisions/high_h2_genes.txt
-python ./new_attr.py --model_name $model_name --enformer_seq_len $enformer_seq_len --path_to_only_genes_file $path_to_only_genes_file --attribution $attribution
+# path_to_only_genes_file=/pollard/data/projects/sdrusinsky/enformer_fine_tuning/data/genes/Whole_Blood/attributions_revisions/high_h2_genes.txt
+# python ./new_attr.py --model_name $model_name --enformer_seq_len $enformer_seq_len --path_to_only_genes_file $path_to_only_genes_file --attribution $attribution
 
-# 15 other genes
-path_to_only_genes_file=/pollard/data/projects/sdrusinsky/enformer_fine_tuning/data/genes/Whole_Blood/attributions_revisions/other_genes.txt
-python ./new_attr.py --model_name $model_name --enformer_seq_len $enformer_seq_len --path_to_only_genes_file $path_to_only_genes_file --attribution $attribution
+# # 15 other genes
+# path_to_only_genes_file=/pollard/data/projects/sdrusinsky/enformer_fine_tuning/data/genes/Whole_Blood/attributions_revisions/other_genes.txt
+# python ./new_attr.py --model_name $model_name --enformer_seq_len $enformer_seq_len --path_to_only_genes_file $path_to_only_genes_file --attribution $attribution
 
-# test genes
-path_to_only_genes_file=/pollard/data/projects/sdrusinsky/enformer_fine_tuning/data/genes/Whole_Blood/test_genes.txt
-python ./new_attr.py --model_name $model_name --enformer_seq_len $enformer_seq_len --path_to_only_genes_file $path_to_only_genes_file --attribution $attribution
+# # test genes
+# path_to_only_genes_file=/pollard/data/projects/sdrusinsky/enformer_fine_tuning/data/genes/Whole_Blood/test_genes.txt
+# python ./new_attr.py --model_name $model_name --enformer_seq_len $enformer_seq_len --path_to_only_genes_file $path_to_only_genes_file --attribution $attribution
 
+#remaining 271 train genes using *** only ref genome grad ***
+path_to_only_genes_file=/pollard/data/projects/sdrusinsky/enformer_fine_tuning/data/genes/Whole_Blood/attributions_revisions/remaining_genes.txt
+python ./new_attr.py --model_name $model_name --enformer_seq_len $enformer_seq_len --path_to_only_genes_file $path_to_only_genes_file --attribution ref_only_grad_input

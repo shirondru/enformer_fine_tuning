@@ -152,7 +152,7 @@ def test_proper_load(model,save_dir,ckpt,valid_ds,precision,atol = 1e-05):
 #     assert seq.size(-1) == 4
 #     return seq - torch.mean(seq, dim=-1, keepdim=True)
 def update_outdir(outdir,analysis):
-    if analysis == 'grad_input':
+    if analysis in ['grad_input','ref_only_grad_input']:
         outdir = os.path.join(outdir,'gradients')
     elif analysis == 'saturation_mutagenesis':
         outdir = os.path.join(outdir,analysis)
@@ -326,6 +326,14 @@ def analyze_enformer(outdir,gene_list,desired_seq_len = 49152,analysis = 'grad_i
             dl = DataLoader(dataset, batch_size=1, shuffle=False) 
             ref_dl = DataLoader(ref_dataset, batch_size=1, shuffle=False)
             if analysis == 'grad_input':
+                get_input_grads(dl,model,
+                    outdir,
+                    run_id,
+                    gene,
+                    'personal_genomes',
+                    skip_check
+                    )
+            if analysis in ['grad_input','ref_only_grad_input']:
                 get_input_grads(ref_dl,model,
                             outdir,
                             run_id,
@@ -333,14 +341,6 @@ def analyze_enformer(outdir,gene_list,desired_seq_len = 49152,analysis = 'grad_i
                             'ref_genome',
                             skip_check
                             )
-            
-                get_input_grads(dl,model,
-                                    outdir,
-                                    run_id,
-                                    gene,
-                                    'personal_genomes',
-                                    skip_check
-                                    )
             else:
                 perform_saturation_mutagenesis(ref_dl,model,
                                 outdir,
@@ -422,6 +422,7 @@ def analyze_performer(metadata,outdir,genes_to_add = None,skip_check = False,onl
                                     gene,
                                     'personal_genomes',
                                     skip_check)
+                if analysis in ['grad_input','ref_only_grad_input']:
                     get_input_grads(ref_dl,
                                     model,
                                     outdir,
@@ -491,7 +492,7 @@ def main():
             gene_list = sorted(list(position_df['gene'].unique()))
 
     if outdir is None:
-        if attribution == 'grad_input':
+        if attribution in ['grad_input','ref_only_grad_input']:
             attr_str = 'RevisionGradInput'
         elif attribution == 'saturation_mutagenesis':
             attr_str = 'RevisionSaturationMutagenesis'
